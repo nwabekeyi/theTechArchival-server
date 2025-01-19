@@ -12,6 +12,7 @@
     "@apollo/subgraph": "^2.9.3",
     "@graphql-tools/schema": "^10.0.14",
     "@redis/client": "^1.6.0",
+    "apollo-server-caching": "^3.3.0",
     "apollo-server-express": "^3.13.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

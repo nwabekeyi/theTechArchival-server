@@ -6,6 +6,8 @@ const { createServer } = require("http");
 const { setupSocket } = require("./socket"); // Socket.IO setup
 require("./config/mongo"); // MongoDB connection setup
 const { connectClient } = require("./redis/redisClient"); // Import the connectClient function to connect to Redis
+const { InMemoryLRUCache } = require('apollo-server-caching'); 
+
 
 dotenv.config();
 
@@ -18,6 +20,7 @@ app.use(
       "http://localhost:3000", // Your React frontend
       "http://localhost:5174", // Your Vite frontend (or other dev tools)
       "https://studio.apollographql.com", // Apollo Studio
+      "https://the-tech-archival-client-side-5wvq.vercel.app"
     ],
     credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   })

@@ -59,7 +59,7 @@ app.use(helmet.contentSecurityPolicy({
   directives: {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.googleapis.com"],
-    connectSrc: ["'self'", "https://firestore.googleapis.com", "wss://babatech-e-learning.onrender.com"], // Allow WSS connection
+    connectSrc: ["'self'", "https://firestore.googleapis.com", "wss://babatech-e-learning.onrender.com", 'https://the-tech-archival-client-side-5wvq.vercel.app'], // Allow WSS connection
     imgSrc: ["'self'", "data:", "https://*"],
     mediaSrc: ["'self'", "https://*"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://*.googleapis.com"],
@@ -70,9 +70,18 @@ app.use(helmet.contentSecurityPolicy({
 
 
 app.use(morgan("dev", { stream: logFile }));
-app.use(cors({ origin: ["http://localhost:5174", "https://babtech-e-learning.onrender.com"],
-  credentials: true
- }));
+app.use(cors({
+  origin: [
+    "http://localhost:5174", // Local development
+    "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site
+    "https://babtech-e-learning.onrender.com" // Another possible origin
+  ],
+  credentials: true, // Allow credentials (cookies, headers)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow the required methods
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
+}));
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
