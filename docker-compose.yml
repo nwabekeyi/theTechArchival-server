@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  messaging_server:
+    build:
+      context: ./messaging_server
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+    restart: always
+
+  server_side:
+    build:
+      context: ./server_side
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+    ports:
+      - "5000:5000"  # The host port is 5050, container port is 5000
+    restart: always
