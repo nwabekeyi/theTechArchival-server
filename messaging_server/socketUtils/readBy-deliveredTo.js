@@ -40,45 +40,43 @@ async function addToDeliveredTo(chatroomName, recipientDetails, messageId) {
 }
 
 
-
 /**
  * Adds a userId to the readBy array for a specific message in the chatroom
  * and returns the updated readBy array.
  * 
  * @param {string} chatroomName - The name of the chatroom.
- * @param {string} userId - The ID of the user.
+ * @param {Object} recipientDetails - The details of the user (including userId).
  * @param {string} messageId - The ID of the message to update.
- * @returns {Array} - The updated readBy array.
+ * @returns {Object} - The updated recipient object with timestamp.
  */
-async function addToReadBy(chatroomName, userId, messageId) {
+async function addToReadBy(chatroomName, recipientDetails, messageId) {
   try {
-    // Find the chatroom by name
-    const chatroom = await ChatRoomMessages.findOne({ chatroomName });
+    // Add a timestamp to the recipient details (like you do for deliveredTo)
+    const recipientWithTimestamp = {
+      ...recipientDetails,
+      timestamp: Date.now(),
+    };
 
-    if (!chatroom) {
-      throw new Error(`Chatroom "${chatroomName}" not found.`);
+    // Perform the update using $addToSet to avoid duplicate entries
+    const result = await ChatRoomMessages.updateOne(
+      { chatroomName, "messages._id": messageId },
+      {
+        $addToSet: { "messages.$.readBy": recipientWithTimestamp },
+      }
+    );
+
+    if (result.nModified === 0) {
+      throw new Error(`Message with ID "${messageId}" not found or user already exists in readBy.`);
     }
 
-    // Find the specific message by messageId in the messages array
-    const message = chatroom.messages.id(messageId);
-
-    if (!message) {
-      throw new Error(`Message with ID "${messageId}" not found in chatroom "${chatroomName}".`);
-    }
-
-    // Add userId to readBy array if it's not already present
-    if (!message.readBy.includes(userId)) {
-      message.readBy.push(userId);
-      await chatroom.save(); // Save the updated chatroom document
-    }
-
-    // Return the updated readBy array
-    return userId;
+    // Return the updated recipient object with timestamp
+    return recipientWithTimestamp;
   } catch (error) {
     console.error(`Error adding user to readBy: ${error.message}`);
     throw error;
   }
 }
+
 
 /**
  * Retrieves the deliveredTo field for a specific message in the chatroom

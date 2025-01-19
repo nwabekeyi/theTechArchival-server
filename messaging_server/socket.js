@@ -97,15 +97,16 @@ const setupSocket = (server, onlineUsers) => {
     });
 
     // Handle readBy
-    socket.on('chatroomMessage readBy', async ({ chatroomName, userId, messageId, senderId }) => {
+    socket.on('chatroomMessage readBy', async ({ chatroomName, recipientDetails, messageId, senderId }) => {
+      console.log('called')
       try {
         // Add user to readBy array and get updated array
-        const readBy = addToReadBy(chatroomName, userId, messageId);
+        const readBy = addToReadBy(chatroomName, recipientDetails, messageId);
 
         // Check if the sender is online
         if (onlineUsers.has(senderId)) {
           const senderSocketId = onlineUsers.get(senderId).socketId;
-          io.to(senderSocketId).emit('messageRead', { chatroomName, messageId, readBy });
+          io.to(senderSocketId).emit('messageRead', { chatroomName, messageId, recipientDetails });
         } else {
           // Store this message update in Redis or another structure to send later
           console.log('Sender is offline. Will wait until sender reconnects.');
