@@ -11,6 +11,27 @@ const { OfflineDeliveredTo, OfflineReadByTo } = require('../models/offlineChatro
  */
 async function addToDeliveredTo(chatroomName, recipientDetails, messageId) {
   try {
+    // Fetch the message to check if the recipient already exists in deliveredTo
+    const message = await ChatRoomMessages.findOne(
+      { chatroomName, "messages._id": messageId },
+      { "messages.$": 1 }
+    );
+
+    if (!message || !message.messages || message.messages.length === 0) {
+      throw new Error(`Message with ID "${messageId}" not found.`);
+    }
+
+    const deliveredTo = message.messages[0].deliveredTo || [];
+    const userAlreadyDelivered = deliveredTo.some(
+      (recipient) => recipient.userId === recipientDetails.userId
+    );
+
+    // Check if the recipient already exists in the deliveredTo array
+    if (userAlreadyDelivered) {
+      return "message already delivered to this user";
+    }
+
+    // If the recipient is not found, add them to the deliveredTo array
     const recipientWithTimestamp = {
       ...recipientDetails,
       timestamp: Date.now(),
@@ -22,7 +43,7 @@ async function addToDeliveredTo(chatroomName, recipientDetails, messageId) {
     );
 
     if (result.nModified === 0) {
-      throw new Error(`Message with ID "${messageId}" not found or recipient already exists in deliveredTo.`);
+      throw new Error(`Message with ID "${messageId}" not found or failed to update.`);
     }
 
     return recipientWithTimestamp;
@@ -32,9 +53,10 @@ async function addToDeliveredTo(chatroomName, recipientDetails, messageId) {
   }
 }
 
+
 /**
  * Adds a userId to the readBy array for a specific message in the chatroom.
- * 
+ *
  * @param {string} chatroomName - The name of the chatroom.
  * @param {Object} recipientDetails - Details of the recipient, including userId.
  * @param {string} messageId - The ID of the message to update.
@@ -65,7 +87,7 @@ async function addToReadBy(chatroomName, recipientDetails, messageId) {
 
 /**
  * Retrieves the deliveredTo field for a specific message in the chatroom.
- * 
+ *
  * @param {string} chatroomName - The name of the chatroom.
  * @param {string} messageId - The ID of the message.
  * @returns {Array} - The deliveredTo array of the message.
@@ -91,7 +113,7 @@ async function getDeliveredTo(chatroomName, messageId) {
 
 /**
  * Retrieves the readBy field for a specific message in the chatroom.
- * 
+ *
  * @param {string} chatroomName - The name of the chatroom.
  * @param {string} messageId - The ID of the message.
  * @returns {Array} - The readBy array of the message.
@@ -117,7 +139,7 @@ async function getReadBy(chatroomName, messageId) {
 
 /**
  * Finds undelivered messages for a specific user in multiple chatrooms.
- * 
+ *
  * @param {Array} chatroomNames - Array of chatroom names.
  * @param {Object} recipientDetails - Details of the recipient, including userId.
  * @returns {Array} - Array of undelivered messages.
@@ -152,7 +174,7 @@ async function findUndeliveredMessages(chatroomNames, recipientDetails) {
 
 /**
  * Updates the deliveredTo field for an offline message.
- * 
+ *
  * @param {Object} details - Object containing chatroomName, senderId, messageId, and deliveredTo.
  */
 async function updateDeliveredTo(chatroomName, senderId, messageId, deliveredTo) {

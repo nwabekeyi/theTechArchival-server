@@ -180,7 +180,22 @@ const createUser = async (req, res) => {
           { $addToSet: { participants: { userId: newUser.userId, profilePictureUrl: newUser.profilePictureUrl, firstName: newUser.firstName, lastName: newUser.lastName } } }
         );
       }
-    
+
+      if (role === 'admin' || role === 'superadmin') {
+        await Chatroom.updateMany(
+          {},
+          {
+            $addToSet: { 
+              participants: { 
+                userId: newUser.userId, 
+                profilePictureUrl: newUser.profilePictureUrl, 
+                firstName: newUser.firstName, 
+                lastName: newUser.lastName 
+              } 
+            } 
+          }
+        );
+      };
 
       return res.status(201).json({ message: `${role} created successfully`, user: newUser });
     }

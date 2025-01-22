@@ -27,10 +27,40 @@ const addCohort = async (req, res) => {
     // Save the new cohort to the database
     await newCohort.save();
 
-    // Create the chatroom for the cohort
+    // Fetch all admins and superadmins from their respective collections
+    const admins = await Admin.find({});
+    const superAdmins = await SuperAdmin.find({});
+
+    // Combine admins and superadmins into one array
+    const allAdmins = [...admins, ...superAdmins];
+
+    // Map all admins and superadmins into the participant structure
+    const participants = allAdmins.map(admin => ({
+      userId: admin._id,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      role: admin.role,  // Assume `role` is a field in the Admin and SuperAdmin schema
+      profilePictureUrl: admin.profilePictureUrl // Assume this field exists
+    }));
+
+    // Include the cohort instructor as a participant if available
+    if (cohortData.instructorId) {
+      const instructor = await Instructor.findById(cohortData.instructorId);
+      if (instructor) {
+        participants.push({
+          userId: instructor._id,
+          firstName: instructor.firstName,
+          lastName: instructor.lastName,
+          role: 'Instructor',
+          profilePictureUrl: instructor.profilePictureUrl,
+        });
+      }
+    }
+
+    // Create the chatroom for the cohort with the admins, superadmins, and instructor
     const newChatroom = new Chatroom({
       name: cohortData.name, 
-      participants: [cohortData.instructorId], 
+      participants, // Add admins, superadmins, and instructor to participants
     });
 
     // Save the new chatroom to the database
@@ -43,7 +73,7 @@ const addCohort = async (req, res) => {
     await course.save();
 
     res.status(201).json({
-      message: 'Cohort added successfully, and chatroom created',
+      message: 'Cohort added successfully, and chatroom created with participants',
       course,
       cohort: newCohort,
       chatroom: newChatroom,

@@ -117,8 +117,23 @@ const setupSocket = (server, onlineUsers) => {
         const chatroom = await getChatroomFromCache(chatroomName);
 
         // Add recipient to deliveredTo list
-        addToDeliveredTo(chatroomName, recipientDetails, messageId, senderId);
+        const deliverTo = await addToDeliveredTo(chatroomName, recipientDetails, messageId, senderId);
 
+
+        //confirm if this has been delivered to this user
+
+        if(deliverTo !== "message already delivered to this user"){
+           // Send to all participants that are online
+            chatroom.participants.forEach(participant => {
+              if (onlineUsers.has(participant.userId)) {
+                const participantSocketId = onlineUsers.get(participant.userId).socketId;
+                io.to(participantSocketId).emit('chatroomMessage delivered', { chatroomName, messageId, recipientDetails });
+              } else {
+                // Store the request for offline user
+                updateDeliveredToList(chatroomName, senderId, messageId, recipientDetails);
+              }
+            });
+        }
         // Send to all participants that are online
         chatroom.participants.forEach(participant => {
           if (onlineUsers.has(participant.userId)) {
@@ -138,15 +153,15 @@ const setupSocket = (server, onlineUsers) => {
       try {
         // Fetch chatroom data from cache
         const chatroom = await getChatroomFromCache(chatroomName);
-        console.log(chatroom)
+        console.log(chatroom.participants)
 
         // Add recipient to readBy list
         addToReadBy(chatroomName, recipientDetails, messageId);
 
         // Send to all participants that are online
         chatroom.participants.forEach(participant => {
+          console.log('checking');
           if (onlineUsers.has(participant.userId)) {
-            console.log('checking');
             const participantSocketId = onlineUsers.get(participant.userId).socketId;
             io.to(participantSocketId).emit('messageRead', { chatroomName, messageId, recipientDetails });
           } else {
