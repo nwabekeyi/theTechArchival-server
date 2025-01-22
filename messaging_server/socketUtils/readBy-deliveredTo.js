@@ -1,85 +1,70 @@
-const {ChatRoomMessages} = require('../models/chatRoomMessages'); // Importing the Chatroom model
-
+const { ChatRoomMessages } = require('../models/chatRoomMessages');
+const { OfflineDeliveredTo, OfflineReadByTo } = require('../models/offlineChatroomMessages');
 
 /**
- * Adds a userId to the deliveredTo array for a specific message in the chatroom
- * and returns the updated deliveredTo array.
+ * Adds a userId to the deliveredTo array for a specific message in the chatroom.
  * 
  * @param {string} chatroomName - The name of the chatroom.
- * @param {string} userId - The ID of the user.
+ * @param {Object} recipientDetails - Details of the recipient, including userId.
  * @param {string} messageId - The ID of the message to update.
- * @returns {Array} - The updated deliveredTo array.
+ * @returns {Object} - The updated recipient object with timestamp.
  */
 async function addToDeliveredTo(chatroomName, recipientDetails, messageId) {
   try {
-    console.log(recipientDetails);
-
     const recipientWithTimestamp = {
       ...recipientDetails,
       timestamp: Date.now(),
     };
 
-    // Perform the update using $addToSet to avoid duplicate entries
     const result = await ChatRoomMessages.updateOne(
       { chatroomName, "messages._id": messageId },
-      {
-        $addToSet: { "messages.$.deliveredTo": recipientWithTimestamp },
-      }
+      { $addToSet: { "messages.$.deliveredTo": recipientWithTimestamp } }
     );
 
     if (result.nModified === 0) {
-      throw new Error(`Message with ID "${messageId}" not found or user already exists in deliveredTo.`);
+      throw new Error(`Message with ID "${messageId}" not found or recipient already exists in deliveredTo.`);
     }
 
-    return recipientWithTimestamp; // Return the updated recipient object with timestamp
-
+    return recipientWithTimestamp;
   } catch (error) {
-    console.error(`Error adding user to deliveredTo: ${error.message}`);
+    console.error(`Error adding to deliveredTo: ${error.message}`);
     throw error;
   }
 }
 
-
 /**
- * Adds a userId to the readBy array for a specific message in the chatroom
- * and returns the updated readBy array.
+ * Adds a userId to the readBy array for a specific message in the chatroom.
  * 
  * @param {string} chatroomName - The name of the chatroom.
- * @param {Object} recipientDetails - The details of the user (including userId).
+ * @param {Object} recipientDetails - Details of the recipient, including userId.
  * @param {string} messageId - The ID of the message to update.
  * @returns {Object} - The updated recipient object with timestamp.
  */
 async function addToReadBy(chatroomName, recipientDetails, messageId) {
   try {
-    // Add a timestamp to the recipient details (like you do for deliveredTo)
     const recipientWithTimestamp = {
       ...recipientDetails,
       timestamp: Date.now(),
     };
 
-    // Perform the update using $addToSet to avoid duplicate entries
     const result = await ChatRoomMessages.updateOne(
       { chatroomName, "messages._id": messageId },
-      {
-        $addToSet: { "messages.$.readBy": recipientWithTimestamp },
-      }
+      { $addToSet: { "messages.$.readBy": recipientWithTimestamp } }
     );
 
     if (result.nModified === 0) {
-      throw new Error(`Message with ID "${messageId}" not found or user already exists in readBy.`);
+      throw new Error(`Message with ID "${messageId}" not found or recipient already exists in readBy.`);
     }
 
-    // Return the updated recipient object with timestamp
     return recipientWithTimestamp;
   } catch (error) {
-    console.error(`Error adding user to readBy: ${error.message}`);
+    console.error(`Error adding to readBy: ${error.message}`);
     throw error;
   }
 }
 
-
 /**
- * Retrieves the deliveredTo field for a specific message in the chatroom
+ * Retrieves the deliveredTo field for a specific message in the chatroom.
  * 
  * @param {string} chatroomName - The name of the chatroom.
  * @param {string} messageId - The ID of the message.
@@ -87,30 +72,25 @@ async function addToReadBy(chatroomName, recipientDetails, messageId) {
  */
 async function getDeliveredTo(chatroomName, messageId) {
   try {
-    // Find the chatroom by name
     const chatroom = await ChatRoomMessages.findOne({ chatroomName });
-    
     if (!chatroom) {
       throw new Error(`Chatroom "${chatroomName}" not found.`);
     }
 
-    // Find the specific message by messageId in the messages array
     const message = chatroom.messages.id(messageId);
-
     if (!message) {
-      throw new Error(`Message with ID "${messageId}" not found in chatroom "${chatroomName}".`);
+      throw new Error(`Message with ID "${messageId}" not found.`);
     }
 
-    // Return the deliveredTo array
     return message.deliveredTo;
   } catch (error) {
-    console.error(`Error retrieving deliveredTo field: ${error.message}`);
+    console.error(`Error retrieving deliveredTo: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * Retrieves the readBy field for a specific message in the chatroom
+ * Retrieves the readBy field for a specific message in the chatroom.
  * 
  * @param {string} chatroomName - The name of the chatroom.
  * @param {string} messageId - The ID of the message.
@@ -118,74 +98,119 @@ async function getDeliveredTo(chatroomName, messageId) {
  */
 async function getReadBy(chatroomName, messageId) {
   try {
-    // Find the chatroom by name
     const chatroom = await ChatRoomMessages.findOne({ chatroomName });
-    
     if (!chatroom) {
       throw new Error(`Chatroom "${chatroomName}" not found.`);
     }
 
-    // Find the specific message by messageId in the messages array
     const message = chatroom.messages.id(messageId);
-
     if (!message) {
-      throw new Error(`Message with ID "${messageId}" not found in chatroom "${chatroomName}".`);
+      throw new Error(`Message with ID "${messageId}" not found.`);
     }
 
-    // Return the readBy array
     return message.readBy;
   } catch (error) {
-    console.error(`Error retrieving readBy field: ${error.message}`);
+    console.error(`Error retrieving readBy: ${error.message}`);
     throw error;
   }
-};
-
+}
 
 /**
  * Finds undelivered messages for a specific user in multiple chatrooms.
- *
- * @param {Array} chatroomNames - An array of chatroom names.
- * @param {string} userId - The ID of the user whose undelivered messages need to be found.
- * @returns {Array} - An array of objects containing chatroomName and message details for undelivered messages.
+ * 
+ * @param {Array} chatroomNames - Array of chatroom names.
+ * @param {Object} recipientDetails - Details of the recipient, including userId.
+ * @returns {Array} - Array of undelivered messages.
  */
 async function findUndeliveredMessages(chatroomNames, recipientDetails) {
   try {
     const undeliveredMessages = [];
 
-    // Loop through each chatroom name in the array
     for (const chatroomName of chatroomNames) {
-      // Find the chatroom by name
       const chatroom = await ChatRoomMessages.findOne({ chatroomName });
-
       if (!chatroom) {
         console.log(`Chatroom "${chatroomName}" not found.`);
         continue;
       }
 
-      // Loop through each message in the chatroom's messages array
       for (const message of chatroom.messages) {
-        // Check if the userId is present in the deliveredTo array for the current message
         const isDelivered = message.deliveredTo.some(
           (recipient) => recipient.userId === recipientDetails.userId
         );
         if (!isDelivered) {
-          // If the userId is not found, push the message details to undeliveredMessages
-          undeliveredMessages.push({
-            chatroomName,
-            message,
-          });
+          undeliveredMessages.push({ chatroomName, message });
         }
       }
     }
 
-    // Return the undeliveredMessages array
     return undeliveredMessages;
-
   } catch (error) {
     console.error(`Error finding undelivered messages: ${error.message}`);
     throw error;
   }
-};
+}
+
+/**
+ * Updates the deliveredTo field for an offline message.
+ * 
+ * @param {Object} details - Object containing chatroomName, senderId, messageId, and deliveredTo.
+ */
+async function updateDeliveredTo(chatroomName, senderId, messageId, deliveredTo) {
+  try {
+    let deliveredDoc = await OfflineDeliveredTo.findOne({ chatroomName });
+    if (!deliveredDoc) {
+      deliveredDoc = new OfflineDeliveredTo({
+        chatroomName,
+        messageDetail: {
+          senderId,
+          messageId,
+          deliveredTo: [],
+        },
+      });
+    }
+
+    const messageDetail = deliveredDoc.messageDetail;
+    if (messageDetail.senderId === senderId && messageDetail.messageId === messageId) {
+      messageDetail.deliveredTo.push(deliveredTo);
+    }
+
+    await deliveredDoc.save();
+    console.log('DeliveredTo updated successfully');
+  } catch (error) {
+    console.error(`Error updating deliveredTo: ${error.message}`);
+  }
+}
+
+/**
+ * Updates the readBy field for an offline message.
+ * 
+ * @param {Object} details - Object containing chatroomName, senderId, messageId, and readBy.
+ */
+async function updateReadBy(chatroomName, senderId, messageId, readBy) {
+  try {
+    let readByDoc = await OfflineReadByTo.findOne({ chatroomName });
+    if (!readByDoc) {
+      readByDoc = new OfflineReadByTo({
+        chatroomName,
+        messageDetail: {
+          senderId,
+          messageId,
+          readBy: [],
+        },
+      });
+    }
+
+    const messageDetail = readByDoc.messageDetail;
+    if (messageDetail.senderId === senderId && messageDetail.messageId === messageId) {
+      messageDetail.readBy.push(readBy);
+    }
+
+    await readByDoc.save();
+    console.log('ReadBy updated successfully');
+  } catch (error) {
+    console.error(`Error updating readBy: ${error.message}`);
+  }
+}
 
 module.exports = {
   findUndeliveredMessages,
@@ -193,7 +218,6 @@ module.exports = {
   addToReadBy,
   getDeliveredTo,
   getReadBy,
-  findUndeliveredMessages
+  updateDeliveredTo,
+  updateReadBy,
 };
-
-

@@ -1,28 +1,22 @@
-// redisService.js
-const redisClient = require('./redisClient');  // Import the Redis client
-const Chatroom = require('../models/ChatRoom');  // Import the Chatroom model
-
+const { Chatroom } = require('../models/ChatRoom');  // Import the Chatroom model
+const { redisClient } = require('./redisClient');
 
 // Promisify Redis functions if needed
 const getAsync = redisClient.get.bind(redisClient);
 const setexAsync = redisClient.setEx.bind(redisClient);
+const keysAsync = redisClient.keys.bind(redisClient);
 
-// Function to fetch chatrooms from MongoDB and cache them in Redis
+// Fetch chatrooms and cache each chatroom individually in Redis
 const fetchChatroomsAndCache = async () => {
   try {
-    // Check Redis cache first
-    const cachedChatrooms = await getCachedChatrooms();
-    if (cachedChatrooms) {
+    const chatroomKeys = await getChatroomKeysFromCache();
+    if (chatroomKeys && chatroomKeys.length > 0) {
       console.log('Cache hit: Chatrooms fetched from Redis');
-      return JSON.parse(cachedChatrooms); // Return parsed chatrooms from cache
+      return await getMultipleChatroomsFromCache(chatroomKeys);
     }
 
-    // If no cache, fetch from MongoDB directly
     const chatrooms = await fetchChatroomsFromMongoDB();
-
-    // Cache the chatrooms in Redis (set with an expiry time of 3600 seconds = 1 hour)
-    await setChatroomsInCache(chatrooms);
-
+    await cacheMultipleChatrooms(chatrooms);
     console.log('Cache miss: Chatrooms fetched from MongoDB');
     return chatrooms;
   } catch (error) {
@@ -31,54 +25,61 @@ const fetchChatroomsAndCache = async () => {
   }
 };
 
-// Fetch chatrooms directly from MongoDB using Mongoose
+// Fetch all chatrooms from MongoDB
 const fetchChatroomsFromMongoDB = async () => {
   try {
-    const chatrooms = await Chatroom.find().exec(); // Fetch all chatrooms
-    return chatrooms;
+    return await Chatroom.find().exec();
   } catch (error) {
     console.error('Error fetching from MongoDB:', error);
     throw error;
   }
 };
 
-// Get chatrooms from Redis cache
-const getCachedChatrooms = async () => {
+// Get all chatroom keys from Redis
+const getChatroomKeysFromCache = async () => {
   try {
-    const data = await getAsync('chatrooms');
-    return data;  // Return the raw data (stringified) if it exists
+    return await keysAsync('chatroom:*');  // Fetch keys with the pattern 'chatroom:*'
   } catch (err) {
-    console.error('Error fetching from Redis:', err);
+    console.error('Error fetching chatroom keys from Redis:', err);
     throw err;
   }
 };
 
-// Set chatrooms in Redis cache
-const setChatroomsInCache = async (chatrooms) => {
+// Get multiple chatrooms from Redis based on chatroom keys
+const getMultipleChatroomsFromCache = async (keys) => {
   try {
-    await setexAsync('chatrooms', 3600, JSON.stringify(chatrooms));
+    const chatrooms = await Promise.all(keys.map(key => getAsync(key)));
+    return chatrooms.map(chatroom => JSON.parse(chatroom));
   } catch (err) {
-    console.error('Error setting in Redis:', err);
+    console.error('Error fetching multiple chatrooms from Redis:', err);
     throw err;
   }
 };
 
-// New function to fetch a specific chatroom by name
+// Cache multiple chatrooms individually in Redis
+const cacheMultipleChatrooms = async (chatrooms) => {
+  try {
+    await Promise.all(chatrooms.map(chatroom => {
+      const chatroomName = chatroom.name; // Assuming `name` is the identifier for the chatroom
+      return setexAsync(`chatroom:${chatroomName}`, 3600, JSON.stringify(chatroom));
+    }));
+  } catch (err) {
+    console.error('Error caching chatrooms in Redis:', err);
+    throw err;
+  }
+};
+
+// Get a specific chatroom by name from Redis or MongoDB
 const getChatroomFromCache = async (chatroomName) => {
   try {
-    // Check Redis cache for specific chatroom
     const cachedChatroom = await getAsync(`chatroom:${chatroomName}`);
     if (cachedChatroom) {
       console.log(`Cache hit: Chatroom "${chatroomName}" fetched from Redis`);
-      return JSON.parse(cachedChatroom); // Return parsed chatroom from cache
+      return JSON.parse(cachedChatroom);
     }
 
-    // If not in cache, fetch from MongoDB
     const chatroom = await fetchChatroomFromMongoDB(chatroomName);
-
-    // Cache the chatroom in Redis (set with an expiry time of 3600 seconds = 1 hour)
     await setChatroomInCache(chatroomName, chatroom);
-
     console.log(`Cache miss: Chatroom "${chatroomName}" fetched from MongoDB`);
     return chatroom;
   } catch (error) {
@@ -87,18 +88,17 @@ const getChatroomFromCache = async (chatroomName) => {
   }
 };
 
-// Fetch specific chatroom from MongoDB using Mongoose
+// Fetch a specific chatroom from MongoDB by name
 const fetchChatroomFromMongoDB = async (chatroomName) => {
   try {
-    const chatroom = await Chatroom.findOne({ name: chatroomName }).exec(); // Fetch chatroom by name
-    return chatroom;
+    return await Chatroom.findOne({ name: chatroomName }).exec();
   } catch (error) {
-    console.error('Error fetching from MongoDB:', error);
+    console.error('Error fetching chatroom from MongoDB:', error);
     throw error;
   }
 };
 
-// Set a specific chatroom in Redis cache
+// Cache a specific chatroom in Redis
 const setChatroomInCache = async (chatroomName, chatroom) => {
   try {
     await setexAsync(`chatroom:${chatroomName}`, 3600, JSON.stringify(chatroom));
@@ -108,4 +108,88 @@ const setChatroomInCache = async (chatroomName, chatroom) => {
   }
 };
 
-module.exports= { fetchChatroomsAndCache, getChatroomFromCache };
+// Fetch `readBy` and `deliveredTo` arrays for a specific message
+const fetchChatroomMessageDetails = async (chatroomName, senderId, messageId) => {
+  try {
+    const readByKey = `chatroom:${chatroomName}:sender:${senderId}:message:${messageId}:readBy`;
+    const deliveredToKey = `chatroom:${chatroomName}:sender:${senderId}:message:${messageId}:deliveredTo`;
+
+    const readByList = await redisClient.lrange(readByKey, 0, -1);
+    const deliveredToList = await redisClient.lrange(deliveredToKey, 0, -1);
+
+    return { readByList, deliveredToList };
+  } catch (error) {
+    console.error(`Error fetching message details for chatroom "${chatroomName}" and messageId "${messageId}":`, error);
+    throw error;
+  }
+};
+
+// Update the `readBy` list for a specific message
+const updateReadByList = async (chatroomName, senderId, messageId, userDetails) => {
+  try {
+    const readByKey = `chatroom:${chatroomName}:sender:${senderId}:message:${messageId}:readBy`;
+
+    // Check if the user already exists in the `readBy` list
+    const existingReadByList = await redisClient.lRange(readByKey, 0, -1); // Get all items in the list
+    const isUserAlreadyInReadByList = existingReadByList.some((entry) => {
+      const parsedEntry = JSON.parse(entry);
+      return parsedEntry.userId === userDetails.userId;  // Check by userId
+    });
+
+    if (!isUserAlreadyInReadByList) {
+      const userData = JSON.stringify({
+        userId: userDetails.userId,
+        firstName: userDetails.firstName,
+        lastName: userDetails.lastName,
+        profilePictureUrl: userDetails.profilePictureUrl,
+        timestamp: new Date(),
+      });
+      await redisClient.rPush(readByKey, userData);
+      console.log(`User ${userDetails.userId} added to readBy list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}"`);
+    } else {
+      console.log(`User ${userDetails.userId} is already in the readBy list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}"`);
+    }
+  } catch (error) {
+    console.error(`Error updating readBy list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}":`, error);
+    throw error;
+  }
+};
+
+// Update the `deliveredTo` list for a specific message
+const updateDeliveredToList = async (chatroomName, senderId, messageId, userDetails) => {
+  try {
+    const deliveredToKey = `chatroom:${chatroomName}:sender:${senderId}:message:${messageId}:deliveredTo`;
+
+    // Check if the user already exists in the `deliveredTo` list
+    const existingDeliveredToList = await redisClient.lRange(deliveredToKey, 0, -1); // Get all items in the list
+    const isUserAlreadyInDeliveredToList = existingDeliveredToList.some((entry) => {
+      const parsedEntry = JSON.parse(entry);
+      return parsedEntry.userId === userDetails.userId;  // Check by userId
+    });
+
+    if (!isUserAlreadyInDeliveredToList) {
+      const userData = JSON.stringify({
+        userId: userDetails.userId,
+        firstName: userDetails.firstName,
+        lastName: userDetails.lastName,
+        profilePictureUrl: userDetails.profilePictureUrl,
+        timestamp: new Date(),
+      });
+      await redisClient.rPush(deliveredToKey, userData);
+      console.log(`User ${userDetails.userId} added to deliveredTo list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}"`);
+    } else {
+      console.log(`User ${userDetails.userId} is already in the deliveredTo list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}"`);
+    }
+  } catch (error) {
+    console.error(`Error updating deliveredTo list for chatroom "${chatroomName}", sender "${senderId}", and message "${messageId}":`, error);
+    throw error;
+  }
+};
+
+module.exports = {
+  fetchChatroomsAndCache,
+  getChatroomFromCache,
+  fetchChatroomMessageDetails,
+  updateReadByList,
+  updateDeliveredToList,
+};

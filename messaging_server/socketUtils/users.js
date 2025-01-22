@@ -23,7 +23,7 @@ const toggleUserOnlineStatus = async (userId, userRole, isOnline, io, socket) =>
         throw new Error('Invalid user role');
     }
 
-    const user = await UserModel.findOne({ userId });  // Find the user by userId in the respective collection
+    const user = await UserModel.findOne({ userId }).exec({ maxTimeMS: 20000 });
 
     if (user) {
       user.status.onlineStatus = isOnline;  // Set the user's online status (true for online, false for offline)

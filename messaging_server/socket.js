@@ -1,13 +1,26 @@
 const { Server } = require("socket.io");
-const { fetchChatroomsAndCache } = require('./redis/redisClient');
-const { toggleUserOnlineStatus } = require('./socketUtils/users');
-const { handleChatroomMessage } = require('./socketUtils/chatroomMessage'); // Import the new logic file
 const { 
-        addToDeliveredTo,
-        addToReadBy,
-        getDeliveredTo,
-        findUndeliveredMessages,
-        getReadBy } = require('./socketUtils/readBy-deliveredTo');
+  fetchChatroomsAndCache,
+  updateReadByList,
+  fetchChatroomOfflineDetails,
+  updateDeliveredToList,
+  getChatroomFromCache
+} = require('./redis/redisCaches');
+const { toggleUserOnlineStatus } = require('./socketUtils/users');
+const { handleChatroomMessage } = require('./socketUtils/chatroomMessage');
+const {
+  addToDeliveredTo,
+  addToReadBy,
+  getDeliveredTo,
+  findUndeliveredMessages,
+  updateDeliveredTo,
+  getReadBy,
+  updateReadBy
+} = require('./socketUtils/readBy-deliveredTo');
+
+// Temporary store for offline requests
+let offlineRequests = [];
+
 
 // Fetch chatrooms once when the server starts and cache them in Redis
 const initializeChatroomsCache = async () => {
@@ -17,6 +30,32 @@ const initializeChatroomsCache = async () => {
   } catch (error) {
     console.error('Error fetching and caching chatrooms on server start:', error);
   }
+};
+
+// Function to process offline requests every 30 seconds
+const processOfflineRequests = () => {
+  setInterval(async () => {
+    if (offlineRequests.length > 0) {
+      for (const request of offlineRequests) {
+        const { type, chatroomName, recipientDetails, messageId, senderId } = request;
+
+        try {
+          if (type === 'deliveredTo') {
+            // Handle deliveredTo
+            updateDeliveredTo(chatroomName, senderId, messageId, recipientDetails);
+          } else if (type === 'readBy') {
+            // Handle readBy
+            updateReadBy(chatroomName, senderId, messageId, recipientDetails);
+          }
+
+          // Remove processed request
+          offlineRequests = offlineRequests.filter(req => req !== request);
+        } catch (error) {
+          console.error(`Error processing offline request: ${error}`);
+        }
+      }
+    }
+  }, 30000); // Every 30 seconds
 };
 
 const setupSocket = (server, onlineUsers) => {
@@ -30,14 +69,16 @@ const setupSocket = (server, onlineUsers) => {
   // Initialize chatrooms cache on server startup
   initializeChatroomsCache();
 
+  // Start processing offline requests every 30 seconds
+  processOfflineRequests();
+
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
 
     socket.on('get undelivered chatroomMessages', ({ chatroomNames, recipientDetails }) => {
       findUndeliveredMessages(chatroomNames, recipientDetails)
         .then(undeliveredMessages => {
-          // console.log('Undelivered messages:', undeliveredMessages); // Log the messages here
-    
           if (chatroomNames && recipientDetails) {
             undeliveredMessages.forEach((chatroomMessage) => {
               socket.emit('chatroom message', chatroomMessage);
@@ -49,81 +90,81 @@ const setupSocket = (server, onlineUsers) => {
         });
     });
 
-    // Send socket.id to the client
     socket.emit('receiveSocketId', { socketId: socket.id });
 
-
-    socket.on('updatedChatroomMessage data', async ({chatroomName, messageId}) => {
+    socket.on('updatedChatroomMessage data', async ({ chatroomName, messageId }) => {
       const deliveredToChatroom = getDeliveredTo(chatroomName, messageId);
-      socket.emit('updatedChatroomMessage data', {deliveredToChatroom})
-
+      socket.emit('updatedChatroomMessage data', { deliveredToChatroom });
     });
 
-    // Handle user connection and update online status
     socket.on('userConnect', async ({ userId, userRole }) => {
       console.log('User connected with data:', { userId, userRole });
 
-      // Update the user's online status in the database
       await toggleUserOnlineStatus(userId, userRole, true, io, socket);
       onlineUsers.set(userId, { socketId: socket.id, role: userRole });
 
-      // Notify all clients that this user is online
       io.emit('userStatusChange', { userId, status: true });
-
-      socket.emit('getUsers', Array.from(onlineUsers));  // Emit the updated list of online users
+      socket.emit('getUsers', Array.from(onlineUsers));
     });
 
-    // Handle incoming chatroom messages
     socket.on('chatroom message', (messageBody) => {
       handleChatroomMessage(io, onlineUsers, socket, messageBody);
     });
 
-    // Handle deliveredTo
     socket.on('chatroomMessage deliveredTo', async ({ chatroomName, recipientDetails, messageId, senderId }) => {
       try {
-        // Add user to deliveredTo array and get updated array
-        const updatedDeliveredTo = addToDeliveredTo(chatroomName, recipientDetails, messageId);
-        
-        // Check if the sender is online
-        if (onlineUsers.has(senderId) && recipientDetails) {
-          const senderSocketId = await onlineUsers.get(senderId).socketId;
-          io.to(senderSocketId).emit('chatroomMessage delivered', { chatroomName, messageId, recipientDetails});
-        } else {
-          console.log('Sender is offline. Will wait until sender reconnects.');
-        }
+        // Fetch chatroom data from cache
+        const chatroom = await getChatroomFromCache(chatroomName);
+
+        // Add recipient to deliveredTo list
+        addToDeliveredTo(chatroomName, recipientDetails, messageId, senderId);
+
+        // Send to all participants that are online
+        chatroom.participants.forEach(participant => {
+          if (onlineUsers.has(participant.userId)) {
+            const participantSocketId = onlineUsers.get(participant.userId).socketId;
+            io.to(participantSocketId).emit('chatroomMessage delivered', { chatroomName, messageId, recipientDetails });
+          } else {
+            // Store the request for offline user
+            updateDeliveredToList(chatroomName, senderId, messageId, recipientDetails);
+          }
+        });
       } catch (error) {
         console.error('Error updating deliveredTo:', error);
       }
     });
 
-    // Handle readBy
     socket.on('chatroomMessage readBy', async ({ chatroomName, recipientDetails, messageId, senderId }) => {
-      console.log('called')
       try {
-        // Add user to readBy array and get updated array
-        const readBy = addToReadBy(chatroomName, recipientDetails, messageId);
+        // Fetch chatroom data from cache
+        const chatroom = await getChatroomFromCache(chatroomName);
+        console.log(chatroom)
 
-        // Check if the sender is online
-        if (onlineUsers.has(senderId)) {
-          const senderSocketId = onlineUsers.get(senderId).socketId;
-          io.to(senderSocketId).emit('messageRead', { chatroomName, messageId, recipientDetails });
-        } else {
-          // Store this message update in Redis or another structure to send later
-          console.log('Sender is offline. Will wait until sender reconnects.');
-        }
+        // Add recipient to readBy list
+        addToReadBy(chatroomName, recipientDetails, messageId);
+
+        // Send to all participants that are online
+        chatroom.participants.forEach(participant => {
+          if (onlineUsers.has(participant.userId)) {
+            console.log('checking');
+            const participantSocketId = onlineUsers.get(participant.userId).socketId;
+            io.to(participantSocketId).emit('messageRead', { chatroomName, messageId, recipientDetails });
+          } else {
+            // Store the request for offline user
+            updateReadByList(chatroomName, senderId, messageId, recipientDetails);
+          }
+        });
       } catch (error) {
         console.error('Error updating readBy:', error);
       }
     });
 
-    // Handle user disconnect
     socket.on('disconnect', async () => {
       const userId = getKey(onlineUsers, socket.id);
       if (userId) {
         const userRole = onlineUsers.get(userId)?.role;
         await toggleUserOnlineStatus(userId, userRole, false, io, socket);
         onlineUsers.delete(userId);
-
         console.log(`User ${userId} with role ${userRole} has disconnected.`);
       }
     });

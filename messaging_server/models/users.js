@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { db1Connection } = require("../config/mongo");
 
-
 // Admin Schema
 const adminSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
@@ -38,7 +37,7 @@ const adminSchema = new mongoose.Schema({
       timestamp: { type: String, required: true }
     }
   ],
-  userId: { type: String, unique: true }, // Keep the userId field
+  userId: { type: String, unique: true },
   profilePictureUrl: { type: String, required: true },
   status: {
     onlineStatus: { type: Boolean, default: false },
@@ -46,7 +45,13 @@ const adminSchema = new mongoose.Schema({
   }
 });
 
-// SuperAdmin Schema
+// // Indexes for Admin Schema
+// adminSchema.index({ email: 1 }, { unique: true });
+// adminSchema.index({ userId: 1 });
+// adminSchema.index({ 'notifications.recipient': 1, 'notifications.readStatus': 1 });
+// adminSchema.index({ 'messages.receiver': 1, 'messages.read': 1 });
+
+// SuperAdmin Schema (similar to Admin)
 const superAdminSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
   email: { type: String, required: true, unique: true },
@@ -89,6 +94,12 @@ const superAdminSchema = new mongoose.Schema({
     lastSeen: { type: Date, default: Date.now }
   }
 });
+
+// // Indexes for SuperAdmin Schema
+// superAdminSchema.index({ email: 1 }, { unique: true });
+// superAdminSchema.index({ userId: 1 });
+// superAdminSchema.index({ 'notifications.recipient': 1, 'notifications.readStatus': 1 });
+// superAdminSchema.index({ 'messages.receiver': 1, 'messages.read': 1 });
 
 // Instructor Schema
 const instructorSchema = new mongoose.Schema({
@@ -149,6 +160,13 @@ const instructorSchema = new mongoose.Schema({
   }
 });
 
+// // Indexes for Instructor Schema
+// instructorSchema.index({ email: 1 }, { unique: true });
+// instructorSchema.index({ userId: 1 });
+// instructorSchema.index({ 'notifications.recipient': 1, 'notifications.readStatus': 1 });
+// instructorSchema.index({ 'messages.receiver': 1, 'messages.read': 1 });
+// instructorSchema.index({ instructorId: 1 });
+
 // Student Schema
 const studentSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
@@ -191,35 +209,26 @@ const studentSchema = new mongoose.Schema({
       timestamp: { type: String, required: true }
     }
   ],
-  studentProgress: { type: Number, default: 0 },
   userId: { type: String, unique: true },
   createdAt: { type: String, default: new Date().toISOString() },
   updatedAt: { type: String, default: new Date().toISOString() },
-  amountPaid: { type: Number, required: true },
   status: {
     onlineStatus: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now }
   }
 });
 
-// Middleware to set userId as _id
-const setUserId = function(next) {
-  if (!this.userId) {
-    this.userId = this._id.toString();
-  }
-  next();
-};
+// // Indexes for Student Schema
+// studentSchema.index({ email: 1 }, { unique: true });
+// studentSchema.index({ userId: 1 });
+// studentSchema.index({ 'notifications.recipient': 1, 'notifications.readStatus': 1 });
+// studentSchema.index({ 'messages.receiver': 1, 'messages.read': 1 });
+// studentSchema.index({ studentId: 1 });
 
-// Apply pre-save middleware to all schemas
-adminSchema.pre('save', setUserId);
-superAdminSchema.pre('save', setUserId);
-instructorSchema.pre('save', setUserId);
-studentSchema.pre('save', setUserId);
-
-// Export Models
-const Admin =  db1Connection.model('Admin', adminSchema);
+// Export the schemas
+const Admin = db1Connection.model('Admin', adminSchema);
 const SuperAdmin = db1Connection.model('SuperAdmin', superAdminSchema);
 const Instructor = db1Connection.model('Instructor', instructorSchema);
-const Student = db1Connection.model('OnlineStudent', studentSchema);
+const Student = db1Connection.model('Student', studentSchema);
 
 module.exports = { Admin, SuperAdmin, Instructor, Student };

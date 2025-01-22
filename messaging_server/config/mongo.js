@@ -9,7 +9,9 @@ const MONGO_URI_DB2 = process.env.MONGO_URI_DB2;
 
 // Function to connect to the first MongoDB database
 function connectToDb1() {
-  const connection1 = mongoose.createConnection(MONGO_URI_DB1);
+  const connection1 = mongoose.createConnection(MONGO_URI_DB1, {
+    serverSelectionTimeoutMS: 60000, // 1 minute timeout
+  });
 
   connection1.on("connected", () => {
     console.log("MongoDB1 has connected successfully");
@@ -33,7 +35,9 @@ function connectToDb1() {
 
 // Function to connect to the second MongoDB database
 function connectToDb2() {
-  const connection2 = mongoose.createConnection(MONGO_URI_DB2);
+  const connection2 = mongoose.createConnection(MONGO_URI_DB2, {
+    serverSelectionTimeoutMS: 60000, // 1 minute timeout
+  });
 
   connection2.on("connected", () => {
     console.log("MongoDB2 has connected successfully");
