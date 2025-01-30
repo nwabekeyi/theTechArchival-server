@@ -6,7 +6,7 @@ const { createServer } = require("http");
 const { setupSocket } = require("./socket"); // Socket.IO setup
 require("./config/mongo"); // MongoDB connection setup
 const { connectClient } = require("./redis/redisClient"); // Import the connectClient function to connect to Redis
-const { InMemoryLRUCache } = require('apollo-server-caching'); 
+const { InMemoryLRUCache } = require('apollo-server-caching');
 
 
 dotenv.config();

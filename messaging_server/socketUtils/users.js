@@ -22,7 +22,7 @@ const toggleUserOnlineStatus = async (userId, userRole, isOnline, io, socket) =>
       default:
         throw new Error('Invalid user role');
     }
-
+    
     const user = await UserModel.findOne({ userId }).exec({ maxTimeMS: 20000 });
 
     if (user) {

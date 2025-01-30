@@ -3,9 +3,6 @@ const { Schema } = mongoose;
 const { ObjectId } = Schema.Types;
 const { db1Connection } = require('../config/mongo');
 
-// Assuming db1Connection is already created
-// const db1Connection = mongoose.createConnection('your-db1-uri-here', { useNewUrlParser: true, useUnifiedTopology: true });
-
 // Chatroom Schema
 const chatroomSchema = new Schema({
   name: { type: String, required: true, unique: true },
@@ -19,60 +16,43 @@ const chatroomSchema = new Schema({
   }],
 }, { timestamps: true });
 
+const watchChatrooms = async () => {
+  try {
+    const changeStream = Chatroom.watch();
+
+    changeStream.on('change', (change) => {
+      switch (change.operationType) {
+        case 'insert':
+          console.log('New chatroom inserted:', change.fullDocument);
+          return true;
+        
+        case 'update':
+          console.log('Chatroom updated:', change.updateDescription.updatedFields);
+          return true;
+
+        case 'replace':
+          console.log('Chatroom replaced:', change.fullDocument);
+          return true;
+
+        case 'delete':
+          console.log('Chatroom deleted:', change.documentKey._id);
+          return true;
+
+        default:
+          return false;
+      }
+    });
+  } catch (err) {
+    console.error('Error watching chatrooms:', err);
+    return false;
+  }
+};
+
+
+// Index on participants.userId
+chatroomSchema.index({ 'participants.userId': 1 });  // Index on 'participants.userId'
+
 // Create Chatroom model on db1
 const Chatroom = db1Connection.model('Chatroom', chatroomSchema);
 
-// Function to watch changes in chatrooms (watching for added/deleted messages and participants)
-const watchChatroomChanges = (io) => {
-  const changeStream = Chatroom.watch([
-    {
-      $match: {
-        $or: [
-          { 'updateDescription.updatedFields.messages': { $exists: true } },
-          { 'updateDescription.updatedFields.participants': { $exists: true } }
-        ]
-      }
-    }
-  ]);
-
-  changeStream.on('change', (change) => {
-    console.log('Change detected:', change);
-
-    // Check for operation type: update (modified fields)
-    if (change.operationType === 'update') {
-      const updatedFields = change.updateDescription.updatedFields;
-
-      // Handle new messages being added
-      if (updatedFields.messages) {
-        const newMessage = updatedFields.messages;
-        io.emit('newMessage', newMessage);  // Send only the newly added message
-      }
-
-      // Handle added participants
-      if (updatedFields.participants) {
-        const newParticipants = updatedFields.participants;
-        io.emit('newParticipants', newParticipants);  // Send details of newly added participants
-      }
-
-      // Handle updated avatarUrl
-      if (updatedFields.avatarUrl) {
-        const updatedAvatarUrl = updatedFields.avatarUrl;
-        io.emit('updatedAvatarUrl', updatedAvatarUrl);  // Send updated avatar URL
-      }
-    }
-
-    // Handle deleted messages
-    if (change.operationType === 'update' && change.updateDescription.removedFields.includes('messages')) {
-      const removedMessageId = change.updateDescription.removedFields.find(field => field.includes('messages.'));
-      io.emit('deletedMessage', removedMessageId);  // Send ID of deleted message
-    }
-
-    // Handle removed participants
-    if (change.operationType === 'update' && change.updateDescription.removedFields.includes('participants')) {
-      const removedParticipantId = change.updateDescription.removedFields.find(field => field.includes('participants.'));
-      io.emit('removedParticipant', removedParticipantId);  // Send ID of removed participant
-    }
-  });
-};
-
-module.exports = { Chatroom, watchChatroomChanges };
+module.exports = { Chatroom, watchChatrooms };

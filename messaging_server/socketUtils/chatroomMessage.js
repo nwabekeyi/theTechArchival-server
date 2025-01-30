@@ -1,8 +1,8 @@
-const { getChatroomFromCache } = require('../redis/redisClient');
+const { getChatroomFromCache } = require('../redis/redisCaches');
 
 const handleChatroomMessage = async (io, onlineUsers, socket, messageBody) => {
   const { chatroomName, readBy, status, _id, sender, message, messageType, deliveredTo, replyTo, mention } = messageBody;
-  console.log(messageBody)
+  console.log(messageBody);
   try {
     const chatroom = await getChatroomFromCache(chatroomName);
     

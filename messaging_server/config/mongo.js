@@ -63,8 +63,36 @@ function connectToDb2() {
 const db1Connection = connectToDb1();
 const db2Connection = connectToDb2();
 
-// Export the connections so they can be used in other files
+// Function to wait for both databases to connect
+async function waitForBothDbs() {
+  const db1Connected = new Promise((resolve) => {
+    if (db1Connection.readyState === 1) {
+      resolve();
+    } else {
+      db1Connection.on("connected", () => {
+        resolve();
+      });
+    }
+  });
+
+  const db2Connected = new Promise((resolve) => {
+    if (db2Connection.readyState === 1) {
+      resolve();
+    } else {
+      db2Connection.on("connected", () => {
+        resolve();
+      });
+    }
+  });
+
+  // Wait until both promises are resolved (both databases are connected)
+  await Promise.all([db1Connected, db2Connected]);
+  return true;
+}
+
+// Export the connections and the wait function
 module.exports = {
   db1Connection,
   db2Connection,
+  waitForBothDbs,
 };

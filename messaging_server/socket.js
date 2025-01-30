@@ -2,7 +2,6 @@ const { Server } = require("socket.io");
 const { 
   fetchChatroomsAndCache,
   updateReadByList,
-  fetchChatroomOfflineDetails,
   updateDeliveredToList,
   getChatroomFromCache
 } = require('./redis/redisCaches');
@@ -14,23 +13,19 @@ const {
   getDeliveredTo,
   findUndeliveredMessages,
   updateDeliveredTo,
-  getReadBy,
   updateReadBy
 } = require('./socketUtils/readBy-deliveredTo');
+const {
+  fetchReadByForMessage, 
+  fetchDeliveredToForMessage
+}= require('./redis/deliveredTo_readby');
+const { startCache} = require('./socketUtils/chatroom');
 
-// Temporary store for offline requests
-let offlineRequests = [];
 
+//start caching chatroom
+startCache();
 
-// Fetch chatrooms once when the server starts and cache them in Redis
-const initializeChatroomsCache = async () => {
-  try {
-    await fetchChatroomsAndCache();  // Fetch and cache chatrooms
-    console.log("Chatrooms cached successfully.");
-  } catch (error) {
-    console.error('Error fetching and caching chatrooms on server start:', error);
-  }
-};
+const offlineRequests = [];
 
 // Function to process offline requests every 30 seconds
 const processOfflineRequests = () => {
@@ -66,8 +61,7 @@ const setupSocket = (server, onlineUsers) => {
     },
   });
 
-  // Initialize chatrooms cache on server startup
-  initializeChatroomsCache();
+
 
   // Start processing offline requests every 30 seconds
   processOfflineRequests();
@@ -75,7 +69,7 @@ const setupSocket = (server, onlineUsers) => {
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-
+//send undelivered chatroom messages
     socket.on('get undelivered chatroomMessages', ({ chatroomNames, recipientDetails }) => {
       findUndeliveredMessages(chatroomNames, recipientDetails)
         .then(undeliveredMessages => {
@@ -88,6 +82,22 @@ const setupSocket = (server, onlineUsers) => {
         .catch(error => {
           console.error("Error fetching undelivered messages:", error);
         });
+    });
+
+    //update chatroom readBy array
+    socket.on('oflline readBy' , async(chatroomName, senderId, messageId) => {
+      const readByArray = await fetchReadByForMessage(chatroomName, senderId, messageId);
+      if(readByArray){
+        socket.emit('offline readBy', readByArray);
+      }
+    });
+
+    //update chatroom readBy array
+    socket.on('oflline deliveredTo' , async(chatroomName, senderId, messageId) => {
+      const deliveredToArray = await fetchDeliveredToForMessage(chatroomName, senderId, messageId);
+      if(deliveredToArray){
+        socket.emit('offline readBy', deliveredToArray);
+      }
     });
 
     socket.emit('receiveSocketId', { socketId: socket.id });
@@ -150,17 +160,17 @@ const setupSocket = (server, onlineUsers) => {
     });
 
     socket.on('chatroomMessage readBy', async ({ chatroomName, recipientDetails, messageId, senderId }) => {
+      console.log(recipientDetails);
       try {
         // Fetch chatroom data from cache
         const chatroom = await getChatroomFromCache(chatroomName);
-        console.log(chatroom.participants)
 
         // Add recipient to readBy list
-        addToReadBy(chatroomName, recipientDetails, messageId);
-
-        // Send to all participants that are online
+        const readBy = addToReadBy(chatroomName, recipientDetails, messageId);
+        
+        if(readBy !== "user already read this message"){
+          // Send to all participants that are online
         chatroom.participants.forEach(participant => {
-          console.log('checking');
           if (onlineUsers.has(participant.userId)) {
             const participantSocketId = onlineUsers.get(participant.userId).socketId;
             io.to(participantSocketId).emit('messageRead', { chatroomName, messageId, recipientDetails });
@@ -169,6 +179,7 @@ const setupSocket = (server, onlineUsers) => {
             updateReadByList(chatroomName, senderId, messageId, recipientDetails);
           }
         });
+        }
       } catch (error) {
         console.error('Error updating readBy:', error);
       }

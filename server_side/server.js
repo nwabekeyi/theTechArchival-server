@@ -67,8 +67,6 @@ app.use(helmet.contentSecurityPolicy({
 }));
 
 
-
-
 app.use(morgan("dev", { stream: logFile }));
 app.use(cors({
   origin: [
