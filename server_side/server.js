@@ -68,6 +68,8 @@ app.use(helmet.contentSecurityPolicy({
 
 
 app.use(morgan("dev", { stream: logFile }));
+
+// The rest of your middleware
 app.use(cors({
   origin: [
     "http://localhost:5174", // Local development
@@ -78,6 +80,19 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow the required methods
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
 }));
+
+// Middleware to handle OPTIONS preflight requests explicitly if needed
+app.options('*', (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*"); // Allow all origins, or specify specific ones
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  res.sendStatus(200); // Respond with OK status for preflight
+});
+
+
+
+// Other middleware and routes follow
+
 
 
 app.use(express.json());
