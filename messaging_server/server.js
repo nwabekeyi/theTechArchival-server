@@ -13,18 +13,29 @@ dotenv.config();
 
 const app = express();
 
-// Middleware setup
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000", // Your React frontend
-      "http://localhost:5174", // Your Vite frontend (or other dev tools)
-      "https://studio.apollographql.com", // Apollo Studio
-      "https://the-tech-archival-client-side-5wvq.vercel.app"
-    ],
-    credentials: true, // Allow credentials (cookies, authorization headers, etc.)
-  })
-);
+// The rest of your middleware
+app.use(cors({
+  origin: [
+    "http://localhost:5174", // Local development
+    "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site
+    "https://babtech-e-learning.onrender.com" // Another possible origin
+  ],
+  credentials: true, // Allow credentials (cookies, headers)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow the required methods
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
+}));
+
+// Middleware to handle OPTIONS preflight requests explicitly if needed
+app.options('*', (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*"); // Allow all origins, or specify specific ones
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  res.sendStatus(200); // Respond with OK status for preflight
+});
+
+
+// Other middleware and routes follow
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
