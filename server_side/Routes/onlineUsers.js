@@ -22,6 +22,8 @@ router.patch('/api/v1/user', uploadImages, userController.patchUser);
 // Route for deleting a user
 router.delete('/api/v1/user', userController.deleteUser);
 
+router.put('/api/v1/user/changePassword', userController.changePassword);
+
 // Route for updating a notification by ID
 router.patch('/api/v1/notification/:notificationId', userController.updateNotificationById);
 

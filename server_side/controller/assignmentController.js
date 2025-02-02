@@ -1,5 +1,5 @@
 const { Cohort} = require('../models/schema/courseSchema');
-const { uploadToDropbox, } = require('../controller/onlinUsers/utils');
+const { uploadToDropbox, deleteFromDropbox} = require('../controller/onlinUsers/utils');
 const {Student} = require('../models/schema/onlineUsers')
 // POST: Add new assignment
 const postAssignment = async (req, res) => {
@@ -187,12 +187,6 @@ const addSubmission = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 // GET: Get all assignments for a specific cohort
 const getAllAssignments = async (req, res) => {
   try {
@@ -211,7 +205,84 @@ const getAllAssignments = async (req, res) => {
   }
 };
 
+
+// PATCH: Resubmit student assignment
+const resubmitAssignment = async (req, res) => {
+  try {
+    const { cohortName, assignmentId } = req.params;
+    const { studentId } = req.body; // Student ID
+    const file = req.files ? req.files.submission : null; // Assume 'submission' is the field for file upload
+
+    if (!file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Find the cohort by cohortName
+    const cohort = await Cohort.findOne({ cohortName: cohortName }).exec();
+    if (!cohort) {
+      return res.status(404).json({ message: 'Cohort not found' });
+    }
+
+    // Find the assignment by assignmentId in the cohort's assignments array
+    const assignment = cohort.assignments.find(a => a.id.toString() === assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    // Check if the student has already submitted an assignment
+    const existingSubmission = assignment.submissions.find(sub => sub.studentId === studentId);
+    if (!existingSubmission) {
+      return res.status(404).json({ message: 'Student submission not found' });
+    }
+
+    // Resolve the local file path using path.resolve to get the absolute path
+    const localFilePath = path.join(__dirname, '../uploads', file[0].filename); // Resolves to the absolute path in 'uploads/' folder
+    const dropboxPath = `/${file[0].filename}`;  // Use file.filename for Dropbox path (e.g., '/1734538091439.docx')
+
+    console.log(`Local File Path: ${localFilePath}`);
+    console.log(`Dropbox Path: ${dropboxPath}`);
+
+    // Upload the new file to Dropbox and get the link
+    const dropboxLink = await uploadToDropbox(localFilePath, dropboxPath);
+
+    // Update the student's existing submission with the new Dropbox link
+    existingSubmission.submission = dropboxLink;
+    existingSubmission.submittedAt = new Date(); // Update submission time
+
+    // Save the updated cohort
+    await cohort.save();
+
+   // Delete the old file from Dropbox after the new file is uploaded
+   if (existingSubmission.submission) {
+    // Extract the file name from the existing Dropbox URL (e.g., /scl/fi/.../filename.jpg)
+    const url = new URL(existingSubmission.submission);
+    const path = url.pathname; // This will give us something like "/scl/fi/..."
+    
+    // Extract the file name from the URL path
+    const fileNameMatch = path.match(/\/scl\/fi\/[^/]+\/([^?]+)\?/);
+    if (fileNameMatch) {
+      const dropboxPathToDelete = `/Apps/The Tech Archival/${fileNameMatch[1]}`; // Create the delete path based on the file name
+      console.log(dropboxPathToDelete);
+      await deleteFromDropbox(dropboxPathToDelete);  // Delete the old file from Dropbox
+    }
+  }
+
+    // Send response with success message and updated assignment
+    res.status(200).json({
+      message: 'Assignment resubmitted successfully',
+      updatedSubmission: existingSubmission
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+
+
+
 module.exports = {
+  resubmitAssignment, // Export the new function
   postAssignment,
   updateAssignment,
   deleteAssignment,

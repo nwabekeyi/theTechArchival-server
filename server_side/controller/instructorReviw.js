@@ -45,8 +45,14 @@ const addReview = async (req, res) => {
       return res.status(404).json({ message: 'Instructor not found' });
     }
 
-    // Add the review to the instructor's reviews array
-    await instructor.addReview(review);
+    // Add the review directly to the instructor's reviews array
+    instructor.reviews.push(review);
+
+    // Recalculate the instructor's average rating
+    instructor.rating = instructor.calculateAverageRating();
+
+    // Save the updated instructor document
+    await instructor.save();
     
     return res.status(201).json({ message: 'Review added successfully', review });
   } catch (error) {
@@ -54,6 +60,7 @@ const addReview = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 // DELETE a review for an instructor by userId
 const deleteReview = async (req, res) => {

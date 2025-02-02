@@ -16,6 +16,7 @@ const app = express();
 // The rest of your middleware
 app.use(cors({
   origin: [
+    "https://the-tech-archival-client-side.vercel.app",
     "http://localhost:5174", // Local development
     "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site
     "https://babtech-e-learning.onrender.com" // Another possible origin
@@ -23,15 +24,19 @@ app.use(cors({
   credentials: true, // Allow credentials (cookies, headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow the required methods
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
+  preflightContinue: false, // Ensure preflight response stops here
+  optionsSuccessStatus: 204 // Some browsers (like Safari) don't accept 200 for OPTIONS
 }));
 
 // Middleware to handle OPTIONS preflight requests explicitly if needed
 app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", "*"); // Allow all origins, or specify specific ones
+  res.header("Access-Control-Allow-Origin", req.headers.origin); // Dynamically allow origin
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
-  res.sendStatus(200); // Respond with OK status for preflight
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204); // Use 204 No Content for preflight response
 });
+
 
 
 // Other middleware and routes follow
@@ -80,7 +85,6 @@ async function startApolloServer() {
   const io = setupSocket(server, onlineUsers, {
     path: "/socket.io",  // Explicit path for Socket.IO
   });
-
   // Server setup (Single port for Express, GraphQL, and Socket.IO)
   const PORT = process.env.PORT || 4000; // Ensure it listens on the correct port
   server.listen(PORT, () => {

@@ -6,7 +6,8 @@ const {
   deleteAssignment,
   getAssignment,
   addSubmission,
-  getAllAssignments
+  getAllAssignments,
+  resubmitAssignment
 } = require('../controller/assignmentController');
 const {uploadFiles} = require('../middleware/multer')
 
@@ -17,5 +18,6 @@ router.put('/api/v1/assignments/:cohortName/:assignmentId', updateAssignment);
 router.delete('/api/v1/assignments/:cohortName/:assignmentId', deleteAssignment);
 router.get('/api/v1/assignments/:cohortName/:assignmentId', getAssignment);
 router.patch('/api/v1/assignments/submissions/:cohortName/:assignmentId', uploadFiles, addSubmission);
+router.patch('/api/v1/assignments/resubmissions/:cohortName/:assignmentId', uploadFiles, resubmitAssignment);
 
 module.exports = router;

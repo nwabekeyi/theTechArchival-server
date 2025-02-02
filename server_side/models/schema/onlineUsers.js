@@ -200,6 +200,18 @@ const studentSchema = new mongoose.Schema({
   }
 });
 
+// Add method to calculate average rating
+instructorSchema.methods.calculateAverageRating = function() {
+  const totalReviews = this.reviews.length;
+  if (totalReviews === 0) {
+    return 0;
+  }
+
+  const sumOfRatings = this.reviews.reduce((acc, review) => acc + review.rating, 0);
+  return sumOfRatings / totalReviews;
+};
+
+
 // Middleware to set userId as _id
 const setUserId = function(next) {
   if (!this.userId) {

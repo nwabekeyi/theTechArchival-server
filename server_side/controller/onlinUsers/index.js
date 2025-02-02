@@ -462,6 +462,43 @@ const getStudentById = async (req, res) => {
 };
 
 
+//change password
+// Change Password Function
+const changePassword = async (req, res) => {
+  const { role, userId, currentPassword, newPassword } = req.body;
+
+  try {
+    const Model = getModelByRole(role);
+    
+    // Find the user by their userId
+    const user = await Model.findOne({ userId });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Compare the current password with the stored password in the database
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash the new password before updating
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password in the database
+    user.password = hashedNewPassword;
+    
+    // Save the updated user record
+    await user.save();
+
+    return res.status(200).json({ message: 'Password updated successfully' });
+
+  } catch (error) {
+    return res.status(500).json({ message: 'Error updating password', error: error.message });
+  }
+};
 
 
 module.exports = {
@@ -471,5 +508,6 @@ module.exports = {
   patchUser,
   deleteUser,
   updateNotificationById,
-  getStudentById
+  getStudentById,
+  changePassword
 };
