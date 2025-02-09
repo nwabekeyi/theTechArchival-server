@@ -16,5 +16,10 @@ module.exports = {
   dbxToken: process.env.DROPBOX_ACCESS_TOKEN,
   MONGO_ATLAS_URI: process.env.MONGO_ATLAS_URI,
   dbxRefreshToken: process.env.DROPBOX_REFRESH_TOKEN,
+  mailer_password: process.env.MAILER_PASS,
+  domain: process.env.DOMAIN,
+  paystackKey : process.env.PAYSTACK_KEY,
+  liveDomain : process.env.LIVE_DOMAIN
+
 };
 

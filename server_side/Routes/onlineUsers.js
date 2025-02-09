@@ -11,7 +11,7 @@ router.post('/api/v1/user', uploadImages, userController.createUser);
 router.get('/api/v1/users', userController.getUsers);
 
 //get student by studentId
-router.get('/api/v1/user/:studentId', userController.getStudentById);
+router.get('/api/v1/user/:userId', userController.getStudentById);
 
 // Route for updating a user's details (full update)
 router.patch('/api/v1/user/:userId', uploadImages, userController.updateUser);
@@ -29,6 +29,10 @@ router.patch('/api/v1/notification/:notificationId', userController.updateNotifi
 
 router.get('/api/v1/payments/receipt/:userId/:paymentId', paymentReceipt);
 
+router.patch('/api/v1/resetPassword', userController.resetPassword);
+
+
+router.post('/api/v1/passwordResetLink', userController.sendPasswordlink);
 
 
 

@@ -21,7 +21,10 @@ const feedback = require("./Routes/feedbackRoute");
 const contact = require("./Routes/contactRoute");
 const instructorReviews = require("./Routes/insructorReviews");
 const payment = require("./Routes/paymentRoute");
-const enquiries = require("./Routes/enquiries")
+const enquiries = require("./Routes/enquiries");
+const resourceRoutes = require('./Routes/resourceRoutes');
+
+
 
 
 // Import rate limiting middleware
@@ -73,6 +76,7 @@ app.use(morgan("dev", { stream: logFile }));
 app.use(cors({
   origin: [
     "https://the-tech-archival-client-side.vercel.app",
+    "https://thetecharchival-clientside.onrender.com/",
     "http://localhost:5174", // Local development
     "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site
     "https://babtech-e-learning.onrender.com" // Another possible origin
@@ -105,9 +109,12 @@ app.use(cookieParser());
 // Serve static files from the Vite `dist` folder
 const distPath = path.join(__dirname, '../client_side','dist');
 app.use(express.static(distPath));
+app.use(express.static(path.join(__dirname, 'public')));
+
 
 // Routes
 app.use(userRouter);
+app.use(resourceRoutes);
 app.use(onlineUsers);
 app.use(auth);
 app.use(code);

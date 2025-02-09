@@ -16,6 +16,7 @@ const app = express();
 // The rest of your middleware
 app.use(cors({
   origin: [
+    "https://thetecharchival-clientside.onrender.com/",
     "https://the-tech-archival-client-side.vercel.app",
     "http://localhost:5174", // Local development
     "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site

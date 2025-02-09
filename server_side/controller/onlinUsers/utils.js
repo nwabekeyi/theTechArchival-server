@@ -298,7 +298,32 @@ const deleteFromDropbox = async (filePath) => {
   }
 };
 
+// find user by email
+const findUserByEmail = async (email) => {
+  try {
+    // Search in the Student collection
+    let user = await Student.findOne({ email });
+    if (user) return { user, role: 'student' };
 
+    // Search in the Instructor collection
+    user = await Instructor.findOne({ email });
+    if (user) return { user, role: 'instructor' };
+
+    // Search in the Admin collection
+    user = await Admin.findOne({ email });
+    if (user) return { user, role: 'admin' };
+
+    // Search in the SuperAdmin collection
+    user = await SuperAdmin.findOne({ email });
+    if (user) return { user, role: 'superadmin' };
+
+    // If user is not found in any collection, return null
+    return null;
+  } catch (error) {
+    console.error(`Error finding user by email: ${error.message}`);
+    throw new Error('Server error while finding user');
+  }
+};
 
 module.exports = {
   uploadToDropbox,
@@ -308,6 +333,7 @@ module.exports = {
   userValidationSchemas,
   generateUserId,
   generateUniqueTransactionId,
-  deleteFromDropbox
+  deleteFromDropbox,
+  findUserByEmail
 
 };

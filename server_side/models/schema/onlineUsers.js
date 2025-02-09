@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+// Add password reset fields to schemas
+const passwordResetField = {
+  resetToken: { type: String, default: null },
+  resetTokenExpires: { type: Date, default: null }
+};
+
 // Admin Schema
 const adminSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
@@ -36,13 +42,16 @@ const adminSchema = new mongoose.Schema({
       timestamp: { type: String, required: true }
     }
   ],
-  userId: { type: String, unique: true }, // Keep the userId field
+  userId: { type: String, unique: true },
   profilePictureUrl: { type: String, required: true },
   status: {
     onlineStatus: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now }
-  }
+  },
+  passwordReset: passwordResetField // Adding password reset field
 });
+
+// Repeat this process for other schemas (SuperAdmin, Instructor, Student)
 
 // SuperAdmin Schema
 const superAdminSchema = new mongoose.Schema({
@@ -85,7 +94,8 @@ const superAdminSchema = new mongoose.Schema({
   status: {
     onlineStatus: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now }
-  }
+  },
+  passwordReset: passwordResetField // Adding password reset field
 });
 
 // Instructor Schema
@@ -144,7 +154,8 @@ const instructorSchema = new mongoose.Schema({
   status: {
     onlineStatus: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now }
-  }
+  },
+  passwordReset: passwordResetField // Adding password reset field
 });
 
 // Student Schema
@@ -197,7 +208,8 @@ const studentSchema = new mongoose.Schema({
   status: {
     onlineStatus: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now }
-  }
+  },
+  passwordReset: passwordResetField // Adding password reset field
 });
 
 // Add method to calculate average rating

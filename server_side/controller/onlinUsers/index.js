@@ -1,4 +1,5 @@
 const { 
+  findUserByEmail,
   uploadToDropbox, 
   generateUniqueTransactionId,  
   generateInstructorId, 
@@ -8,6 +9,7 @@ const {
   deleteFromDropbox
 } = require('./utils');
 const fs = require('fs');;
+const {sendPasswordResetEmail}= require('../../configs/nodeMailer')
 
 const yup = require('yup');
 const bcrypt = require('bcryptjs');
@@ -16,17 +18,14 @@ const { Cohort } = require('../../models/schema/courseSchema'); // Import Cohort
 const Payment = require('../../models/schema/paymentSchema');
 const Chatroom = require('../../models/schema/chatRoom');
 const path = require('path');
-const {Student} = require('../../models/schema/onlineUsers')
+const {Student, Admin, SuperAdmin, Instructor} = require('../../models/schema/onlineUsers')
 
-// Create User Function
 const createUser = async (req, res) => {
   const { role, program, password, cohort, amountPaid } = req.body;
 
   try {
-
     // Validate the role using schemas
     const validationSchema = userValidationSchemas[role];
-
     if (!validationSchema) {
       return res.status(400).json({ message: 'Invalid role' });
     }
@@ -54,23 +53,23 @@ const createUser = async (req, res) => {
     }
 
     // Handle file uploads (e.g., profile picture, ID card)
-    if (req.files) {
-      const processFileUpload = async (file, folderName, dbField) => {
-        const filePath = path.join(__dirname, '../../uploads', file.filename);
+    const processFileUpload = async (file, folderName, dbField) => {
+      const filePath = path.join(__dirname, '../../uploads', file.filename);
 
-        if (fs.existsSync(filePath)) {
-          try {
-            const encodedFileName = encodeURIComponent(file.originalname);
-            const dropboxPath = `/theTechArchival/${folderName}/${encodedFileName}`;
-            user[dbField] = await uploadToDropbox(filePath, dropboxPath);
-          } catch (error) {
-            return res.status(500).json({ message: `Error uploading ${dbField}: ${error.message}` });
-          }
-        } else {
-          return res.status(400).json({ message: `${dbField} file not found in uploads directory` });
+      if (fs.existsSync(filePath)) {
+        try {
+          const encodedFileName = encodeURIComponent(file.originalname);
+          const dropboxPath = `/theTechArchival/${folderName}/${encodedFileName}`;
+          user[dbField] = await uploadToDropbox(filePath, dropboxPath);
+        } catch (error) {
+          throw new Error(`Error uploading ${dbField}: ${error.message}`);
         }
-      };
+      } else {
+        throw new Error(`${dbField} file not found in uploads directory`);
+      }
+    };
 
+    if (req.files) {
       if (req.files.profilePictureUrl) {
         const profilePicture = req.files.profilePictureUrl[0];
         await processFileUpload(profilePicture, 'profilepictures', 'profilePictureUrl');
@@ -83,124 +82,116 @@ const createUser = async (req, res) => {
     }
 
     // Ensure the profile picture is available before proceeding
-    if (user.profilePictureUrl) {
-      const Model = getModelByRole(role);
-      const newUser = new Model(user);
-      await newUser.save();
-
-      if (role === 'student') {
-        if (amountPaid) {
-          const transactionId = await generateUniqueTransactionId();
-          const payment = new Payment({
-            userId: newUser.userId,
-            amount: amountPaid,
-            status: "completed",
-            transactionId,
-          });
-          await payment.save();
-        }
-
-        await Course.updateOne(
-          { courseName: program },
-          { $addToSet: { students: newUser.userId } }
-        );
-
-        const cohortDoc = await Cohort.findOne({ cohortName: cohort });
-        if (cohortDoc) {
-          await Cohort.updateOne(
-            { cohortName: cohort },
-            { $addToSet: { students: newUser.userId } }
-          );
-        } else {
-          return res.status(404).json({ message: 'Cohort not found' });
-        }
-
-        await Chatroom.updateOne(
-          { name: { $regex: new RegExp(`^${cohort.trim()}`, "i") } },  // case-insensitive regex match
-          {
-            $addToSet: {
-              participants: {
-                userId: newUser.userId,
-                profilePictureUrl: newUser.profilePictureUrl,
-                firstName: newUser.firstName,
-                lastName: newUser.lastName,
-                role: newUser.role,
-              }
-            }
-          }
-        );
-        
-
-        await Course.updateOne(
-          { 'cohorts.cohortName': cohort },
-          { $addToSet: { 'cohorts.$.students': newUser.userId } }
-        );
-      }
-
-      if (role === 'instructor') {
-        await Course.updateOne(
-          { courseName: program },
-          { $addToSet: { instructors: newUser.userId } }
-        );
-
-        const cohortDoc = await Cohort.findOne({ cohortName: cohort });
-        if (cohortDoc) {
-          await Cohort.updateOne(
-            { cohortName: cohort },
-            { $addToSet: { instructors: newUser.userId } }
-          );
-        } else {
-          return res.status(404).json({ message: 'Cohort not found' });
-        }
-
-        await Chatroom.updateOne(
-          { name: { $regex: new RegExp(`^${cohort.trim()}`, "i") } },  // case-insensitive regex match
-          {
-            $addToSet: {
-              participants: {
-                userId: newUser.userId,
-                profilePictureUrl: newUser.profilePictureUrl,
-                firstName: newUser.firstName,
-                lastName: newUser.lastName,
-              }
-            }
-          }
-        );
-        
-
-        await Course.updateOne(
-          { 'cohorts.cohortName': cohort },
-          { $addToSet: { 'cohorts.$.instructors': newUser.userId } }
-        );
-      }
-
-      if (role === 'admin' || role === 'superadmin') {
-        await Chatroom.updateMany(
-          {},
-          { $addToSet: { participants: { userId: newUser.userId, profilePictureUrl: newUser.profilePictureUrl, firstName: newUser.firstName, lastName: newUser.lastName } } }
-        );
-      }
-
-      if (role === 'admin' || role === 'superadmin') {
-        await Chatroom.updateMany(
-          {},
-          {
-            $addToSet: { 
-              participants: { 
-                userId: newUser.userId, 
-                profilePictureUrl: newUser.profilePictureUrl, 
-                firstName: newUser.firstName, 
-                lastName: newUser.lastName 
-              } 
-            } 
-          }
-        );
-      };
-
-      return res.status(201).json({ message: `${role} created successfully`, user: newUser });
+    if (!user.profilePictureUrl) {
+      return res.status(400).json({ message: 'Profile picture URL is missing' });
     }
 
-    return res.status(400).json({ message: 'Profile picture URL is missing' });
+    const Model = getModelByRole(role);
+    const newUser = new Model(user);
+    await newUser.save();
+
+    if (role === 'student') {
+      if (amountPaid) {
+        const transactionId = await generateUniqueTransactionId();
+        const payment = new Payment({
+          userId: newUser.userId,
+          amount: amountPaid,
+          status: "completed",
+          transactionId,
+        });
+        await payment.save();
+      }
+
+      await Course.updateOne(
+        { courseName: program },
+        { $addToSet: { students: newUser.userId } }
+      );
+
+      const cohortDoc = await Cohort.findOne({ cohortName: cohort });
+      if (cohortDoc) {
+        await Cohort.updateOne(
+          { cohortName: cohort },
+          { $addToSet: { students: newUser.userId } }
+        );
+      } else {
+        return res.status(404).json({ message: 'Cohort not found' });
+      }
+
+      await Chatroom.updateOne(
+        { name: { $regex: new RegExp(`^${cohort.trim()}`, "i") } },  // case-insensitive regex match
+        {
+          $addToSet: {
+            participants: {
+              userId: newUser.userId,
+              profilePictureUrl: newUser.profilePictureUrl,
+              firstName: newUser.firstName,
+              lastName: newUser.lastName,
+              role: newUser.role,
+            }
+          }
+        }
+      );
+
+      await Course.updateOne(
+        { 'cohorts.cohortName': cohort },
+        { $addToSet: { 'cohorts.$.students': newUser.userId } }
+      );
+    }
+
+    if (role === 'instructor') {
+      await Course.updateOne(
+        { courseName: program },
+        { $addToSet: { instructors: newUser.userId } }
+      );
+
+      const cohortDoc = await Cohort.findOne({ cohortName: cohort });
+      if (cohortDoc) {
+        await Cohort.updateOne(
+          { cohortName: cohort },
+          { $addToSet: { instructors: newUser.userId } }
+        );
+      } else {
+        return res.status(404).json({ message: 'Cohort not found' });
+      }
+
+      await Chatroom.updateOne(
+        { name: { $regex: new RegExp(`^${cohort.trim()}`, "i") } },  // case-insensitive regex match
+        {
+          $addToSet: {
+            participants: {
+              userId: newUser.userId,
+              profilePictureUrl: newUser.profilePictureUrl,
+              firstName: newUser.firstName,
+              lastName: newUser.lastName,
+            }
+          }
+        }
+      );
+
+      await Course.updateOne(
+        { 'cohorts.cohortName': cohort },
+        { $addToSet: { 'cohorts.$.instructors': newUser.userId } }
+      );
+    }
+
+    if (role === 'admin' || role === 'superadmin') {
+      await Chatroom.updateMany(
+        {},
+        {
+          $addToSet: {
+            participants: {
+              userId: newUser.userId,
+              profilePictureUrl: newUser.profilePictureUrl,
+              firstName: newUser.firstName,
+              lastName: newUser.lastName
+            }
+          }
+        }
+      );
+    }
+
+    // Send success response
+    return res.status(201).json({ message: `${role} created successfully`, user: newUser });
   } catch (error) {
     console.error(error);
     if (error instanceof yup.ValidationError) {
@@ -437,16 +428,16 @@ return res.status(500).json({ message: 'Error updating notification', error: err
 
 // Fetch student by studentId
 const getStudentById = async (req, res) => {
-  const { studentId } = req.params; // Extract studentId from URL params
+  const { userId } = req.params; // Extract studentId from URL params
 
   try {
     // Check if studentId is provided
-    if (!studentId) {
+    if (!userId) {
       return res.status(400).json({ message: 'Student ID is required' });
     }
 
     // Fetch student from the database using the studentId
-    const student = await Student.findOne({ studentId });
+    const student = await Student.findOne({ userId });
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
@@ -462,7 +453,7 @@ const getStudentById = async (req, res) => {
 };
 
 
-//change password
+
 // Change Password Function
 const changePassword = async (req, res) => {
   const { role, userId, currentPassword, newPassword } = req.body;
@@ -501,7 +492,81 @@ const changePassword = async (req, res) => {
 };
 
 
+const resetPassword = async (req, res) => {
+  const { email, token, newPassword } = req.body;
+
+  try {
+    console.log('Password reset process started');
+    // Search for the user across different collections
+    let user = await Admin.findOne({ email })
+                || await SuperAdmin.findOne({ email: email })
+                || await Instructor.findOne({ email: email })
+                || await Student.findOne({ email: email });
+
+    console.log('User lookup complete', user);
+
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the token matches
+    console.log('Checking token');
+    if (user.passwordReset.resetToken !== token) {
+      console.log('Invalid token');
+      return res.status(400).json({ error: 'Invalid token' });
+    }
+
+    // Check if the token has expired
+    const now = new Date();
+    if (user.passwordReset.resetTokenExpires < now) {
+      console.log('Token expired');
+      return res.status(400).json({ error: 'Token expired' });
+    }
+
+    // Hash the new password
+    console.log('Hashing new password');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password and reset tokens
+    user.password = hashedPassword;
+    user.passwordReset.resetToken = null;
+    user.passwordReset.resetTokenExpires = null;
+    await user.save();
+    
+    console.log('Password reset successful');
+    return res.status(200).json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
+const sendPasswordlink = async (req, res) => {
+  try {
+    const result = await findUserByEmail(req.body.email); // Get result containing user and role
+    if (!result) {
+      // If user is not found, respond and stop further execution
+      return res.status(404).json({ message: 'User not found' });
+    } else {
+      const { user } = result; // Extract the user object from result
+      await sendPasswordResetEmail(user.email, user); // Assuming you have an async function for sending email.
+
+      // Send success response after email is sent
+      return res.status(200).json({ message: 'Password reset link sent successfully' });
+    }
+
+  } catch (error) {
+    // Handle errors and send the response if there's an error
+    return res.status(500).json({ message: 'Error sending password reset link', error: error.message });
+  }
+};
+
+
+
 module.exports = {
+  resetPassword,
   createUser,
   getUsers,
   updateUser,
@@ -509,5 +574,6 @@ module.exports = {
   deleteUser,
   updateNotificationById,
   getStudentById,
-  changePassword
+  changePassword,
+  sendPasswordlink
 };
