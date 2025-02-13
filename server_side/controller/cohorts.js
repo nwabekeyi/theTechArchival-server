@@ -229,6 +229,8 @@ const getCohortStudents = async (req, res) => {
 
       return {
         studentId: student.studentId,
+        phoneNumber: student.phoneNumber,
+        email: student.email,
         firstName: student.firstName,
         lastName: student.lastName,
         profilePicture: student.profilePictureUrl,

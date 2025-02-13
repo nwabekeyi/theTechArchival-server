@@ -67,13 +67,13 @@ const addCurriculum = async (req, res) => {
   const getAllCurriculums = async (req, res) => {
     try {
       const { courseId } = req.params;
-  
+
       // Find the course by courseId
       const course = await Course.findOne({ courseId: courseId});
       if (!course) {
         return res.status(404).json({ message: "Course not found" });
       }
-  
+
       // Return the curriculum array directly from the course
       res.status(200).json({ curriculum: course.curriculum });
     } catch (error) {
@@ -81,18 +81,18 @@ const addCurriculum = async (req, res) => {
       res.status(500).json({ message: "Server error" });
     }
   };
-  
+
   // Delete a curriculum from a course by curriculumId
   const deleteCurriculum = async (req, res) => {
     try {
       const { courseId, curriculumId } = req.body;
-  
+
       // Find the course by courseId
       const course = await Course.findOne({ courseId });
       if (!course) {
         return res.status(404).json({ message: "Course not found" });
       }
-  
+
       // Find the curriculum entry by its _id
       const curriculumIndex = course.curriculum.findIndex((item) => item._id.toString() === curriculumId);
       if (curriculumIndex === -1) {
@@ -110,10 +110,36 @@ const addCurriculum = async (req, res) => {
       res.status(500).json({ message: "Server error" });
     }
   };
+
+
+  const getAllResources = async (req, res) => {
+    try {
+      const { courseId } = req.params;
+  
+      // Find the course by courseId
+      const course = await Course.findOne({ courseId: courseId });
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+  
+      // Combine all resources from the curriculums into one array
+      const allResources = course.curriculum.reduce((resources, curriculum) => {
+        return resources.concat(curriculum.resources);
+      }, []);
+  
+      // Return the array of resources
+      res.status(200).json({ resources: allResources });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  };
+  
   
   module.exports = {
     addCurriculum,
     updateCurriculum,
     getAllCurriculums,
     deleteCurriculum,
+    getAllResources
   };

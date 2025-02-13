@@ -22,8 +22,7 @@ const contact = require("./Routes/contactRoute");
 const instructorReviews = require("./Routes/insructorReviews");
 const payment = require("./Routes/paymentRoute");
 const enquiries = require("./Routes/enquiries");
-const resourceRoutes = require('./Routes/resourceRoutes');
-
+const announcementRoutes = require('./Routes/announcement');
 
 
 
@@ -76,21 +75,21 @@ app.use(morgan("dev", { stream: logFile }));
 app.use(cors({
   origin: [
     "https://the-tech-archival-client-side.vercel.app",
-    "https://thetecharchival-clientside.onrender.com/",
+    "https://thetecharchival-clientside.onrender.com",  // This is your client-side origin
     "http://localhost:5174", // Local development
-    "https://the-tech-archival-client-side-5wvq.vercel.app", // Production site
-    "https://babtech-e-learning.onrender.com" // Another possible origin
+    "https://the-tech-archival-client-side-5wvq.vercel.app",
+    "https://babtech-e-learning.onrender.com"
   ],
   credentials: true, // Allow credentials (cookies, headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Allow the required methods
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
-  preflightContinue: false, // Ensure preflight response stops here
-  optionsSuccessStatus: 204 // Some browsers (like Safari) don't accept 200 for OPTIONS
+  preflightContinue: false,
+  optionsSuccessStatus: 204 // For compatibility with older browsers
 }));
 
 // Middleware to handle OPTIONS preflight requests explicitly if needed
 app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin); // Dynamically allow origin
+  res.header("Access-Control-Allow-Origin", '*'); // Dynamically allow origin
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS", "PATCH");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -113,8 +112,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 
 // Routes
+app.use(announcementRoutes);
 app.use(userRouter);
-app.use(resourceRoutes);
 app.use(onlineUsers);
 app.use(auth);
 app.use(code);
