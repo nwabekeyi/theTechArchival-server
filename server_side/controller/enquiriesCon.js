@@ -12,17 +12,22 @@ const getEnquiries = async (req, res) => {
 
 // Controller to create a new enquiry
 const postEnquiry = async (req, res) => {
-    console.log('called')
   const { name, message, phoneNumber } = req.body;
+
+  if (!name || !message || !phoneNumber) {
+    return res.status(400).json({ error: 'Name, message, and phone number are required.' });
+  }
 
   try {
     const enquiry = new Enquiry({ name, message, phoneNumber });
     await enquiry.save();
-    res.status(201).json(enquiry);
+    return res.status(201).json(enquiry);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create enquiry' });
+    console.error('Error creating enquiry:', error);  // Log the error for debugging
+    return res.status(500).json({ error: 'Failed to create enquiry due to server error.' });
   }
 };
+
 
 // Controller to toggle read status
 const patchEnquiryReadStatus = async (req, res) => {
@@ -33,10 +38,11 @@ const patchEnquiryReadStatus = async (req, res) => {
     if (!enquiry) {
       return res.status(404).json({ error: 'Enquiry not found' });
     }
-
-    enquiry.read = !enquiry.read; // Toggle read status
-    await enquiry.save();
-    res.status(200).json(enquiry);
+    if(!enquiry.read){
+      enquiry.read = true;
+      await enquiry.save();
+      res.status(200).json(enquiry);
+    }
   } catch (error) {
     res.status(500).json({ error: 'Failed to update enquiry status' });
   }

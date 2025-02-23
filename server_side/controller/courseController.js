@@ -1,5 +1,7 @@
 const {Course, Cohort} = require('../models/schema/courseSchema');  // Adjust the path based on your folder structure
 const Chatroom = require('../models/schema/chatRoom');
+const {Student, Instructor} = require('../models/schema/onlineUsers');
+
 // Function to generate a unique courseId
 async function generateCourseId(courseName) {
   const baseCourseId = `${courseName.replace(/\s+/g, '')}`; // Remove spaces in courseName

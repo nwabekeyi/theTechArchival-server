@@ -71,15 +71,18 @@ app.use(helmet.contentSecurityPolicy({
 
 app.use(morgan("dev", { stream: logFile }));
 
+/// List of allowed origins
+const allowedOrigins = [
+  "https://the-tech-archival-client-side.vercel.app",
+  "https://thetecharchival-clientside.onrender.com",
+  "http://localhost:5174",
+  "https://the-tech-archival-client-side-5wvq.vercel.app",
+  "https://babtech-e-learning.onrender.com"
+];
+
 // The rest of your middleware
 app.use(cors({
-  origin: [
-    "https://the-tech-archival-client-side.vercel.app",
-    "https://thetecharchival-clientside.onrender.com",  // This is your client-side origin
-    "http://localhost:5174", // Local development
-    "https://the-tech-archival-client-side-5wvq.vercel.app",
-    "https://babtech-e-learning.onrender.com"
-  ],
+  origin: allowedOrigins,
   credentials: true, // Allow credentials (cookies, headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Allow the required methods
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // Allow specific headers
@@ -87,14 +90,22 @@ app.use(cors({
   optionsSuccessStatus: 204 // For compatibility with older browsers
 }));
 
-// Middleware to handle OPTIONS preflight requests explicitly if needed
+
+// Middleware to handle OPTIONS preflight requests explicitly
 app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", '*'); // Dynamically allow origin
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS", "PATCH");
+  const origin = req.headers.origin;
+
+  // Check if the request's origin is in the allowed origins list
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin); // Dynamically set the origin
+  }
+
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
   res.header("Access-Control-Allow-Credentials", "true");
   res.sendStatus(204); // Use 204 No Content for preflight response
 });
+
 
 
 // Other middleware and routes follow

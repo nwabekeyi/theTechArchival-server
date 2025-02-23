@@ -1,6 +1,6 @@
 const { Course, Cohort } = require('../models/schema/courseSchema'); 
 const Chatroom = require('../models/schema/chatRoom'); 
-const {Student, Instructor} = require('../models/schema/onlineUsers');
+const {Student, Instructor, Admin, SuperAdmin} = require('../models/schema/onlineUsers');
 
 // Add a new cohort to a course and automatically create a chatroom
 const addCohort = async (req, res) => {

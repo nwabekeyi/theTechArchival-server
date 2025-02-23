@@ -275,52 +275,84 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   const { userId, role, courseName, cohortName } = req.body;
 
+  // Validate required fields
+  if (!userId || !role) {
+    return res.status(400).json({ message: 'User ID and role are required' });
+  }
+
+
   try {
+    // Get model based on the role
     const Model = getModelByRole(role);
+    if (!Model) {
+      return res.status(400).json({ message: `Invalid role: ${role}` });
+    }
+
+    // Find and delete user by userId
     const userToDelete = await Model.findOneAndDelete({ userId });
 
     if (!userToDelete) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // If user has a profile picture, delete from Dropbox
     if (userToDelete.profilePictureUrl) {
-      await deleteFromDropbox(userToDelete.profilePictureUrl);
+      try {
+        await deleteFromDropbox(userToDelete.profilePictureUrl);
+      } catch (dropboxError) {
+        return res.status(500).json({ message: 'Error deleting user profile picture from Dropbox', error: dropboxError.message });
+      }
     }
 
+    // Handle specific role-based deletion
     if (role === 'admin' || role === 'superadmin') {
-      await Chatroom.updateMany(
-        { participants: { userId } },
-        { $pull: { participants: { userId } } }
-      );
+      try {
+        await Chatroom.updateMany(
+          { participants: { userId } },
+          { $pull: { participants: { userId } } }
+        );
+      } catch (chatroomError) {
+        return res.status(500).json({ message: 'Error updating chatrooms after admin/superadmin deletion', error: chatroomError.message });
+      }
     }
 
     if (role === 'student') {
-      await Course.updateMany(
-        { courseName },
-        { $pull: { students: userId } }
-      );
-
-      await Cohort.updateMany(
-        { cohortName },
-        { $pull: { students: userId } }
-      );
+      try {
+        await Course.updateMany(
+          { courseName },
+          { $pull: { students: userId } }
+        );
+        await Cohort.updateMany(
+          { cohortName },
+          { $pull: { students: userId } }
+        );
+      } catch (courseError) {
+        return res.status(500).json({ message: 'Error removing student from courses or cohorts', error: courseError.message });
+      }
     } else if (role === 'instructor') {
-      await Course.updateMany(
-        { courseName },
-        { $pull: { instructors: userId } }
-      );
-
-      await Cohort.updateMany(
-        { cohortName },
-        { $pull: { instructors: userId } }
-      );
+      try {
+        await Course.updateMany(
+          { courseName },
+          { $pull: { instructors: userId } }
+        );
+        await Cohort.updateMany(
+          { cohortName },
+          { $pull: { instructors: userId } }
+        );
+      } catch (instructorError) {
+        return res.status(500).json({ message: 'Error removing instructor from courses or cohorts', error: instructorError.message });
+      }
     }
 
+    // Successful deletion
     return res.status(200).json({ message: 'User deleted successfully and removed from all related fields' });
+
   } catch (error) {
+    // Catch any general errors and respond with a 500 status
     return res.status(500).json({ message: 'Error deleting user and removing them from related fields', error: error.message });
   }
 };
+
 
 
 // Get users by role
