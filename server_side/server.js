@@ -110,8 +110,6 @@ app.options('*', (req, res) => {
 
 // Other middleware and routes follow
 
-
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

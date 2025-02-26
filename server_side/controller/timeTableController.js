@@ -100,7 +100,7 @@ const markAttendance = async (req, res) => {
     }
     
     // Find the timetable entry based on timeTableId
-    const timetableEntry = cohort.timetable.find(entry => entry._id.toString() === timeTableId);
+    const timetableEntry = cohort.timetable.find(entry => entry.id.toString() === timeTableId);
     
     if (!timetableEntry) {
       return res.status(404).json({ message: 'Timetable entry not found' });
@@ -123,10 +123,41 @@ const markAttendance = async (req, res) => {
   }
 };
 
+
+// Mark a timetable entry as done by its ID
+const markTimetableAsDone = async (req, res) => {
+  try {
+    const { cohortName, entryId } = req.body; // cohortName and entryId passed via request parameters
+console.log(cohortName)
+    // Find the cohort by cohortName
+    const cohort = await Cohort.findOne({ cohortName: cohortName });
+    if (!cohort) {
+      return res.status(404).json({ message: 'Cohort not found' });
+    }
+
+    // Find the specific timetable entry by its ID
+    const timetableEntry = cohort.timetable.find(entry => entry.id.toString() === entryId);
+    if (!timetableEntry) {
+      return res.status(404).json({ message: 'Timetable entry not found' });
+    }
+
+    // Mark the timetable entry as done
+    timetableEntry.done = true;
+
+    // Save the updated cohort
+    await cohort.save();
+
+    res.status(200).json({ message: 'Timetable entry marked as done successfully', timetable: cohort.timetable });
+  } catch (error) {
+    res.status(500).json({ message: 'Error marking timetable entry as done', error });
+  }
+};
+
 module.exports = {
   getTimetable,
   addTimetableEntry,
   updateTimetableEntry,
   deleteTimetableEntry,
   markAttendance,
+  markTimetableAsDone
 };

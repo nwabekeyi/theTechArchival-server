@@ -8,7 +8,6 @@ require("./config/mongo"); // MongoDB connection setup
 const { connectClient } = require("./redis/redisClient"); // Import the connectClient function to connect to Redis
 const { InMemoryLRUCache } = require('apollo-server-caching');
 
-
 dotenv.config();
 
 const app = express();

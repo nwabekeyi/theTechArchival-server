@@ -5,7 +5,8 @@ const {
   addTimetableEntry,
   updateTimetableEntry,
   deleteTimetableEntry,
-  markAttendance
+  markAttendance,
+  markTimetableAsDone
 } = require('../controller/timeTableController'); // Adjust the path to your actual controller
 
 // Route to get all timetable entries for a specific cohort
@@ -21,5 +22,7 @@ router.put('/api/v1/timetable/:cohortName/:entryId', updateTimetableEntry);
 router.delete('/api/v1/timetable/:cohortName/:entryId', deleteTimetableEntry);
 
 router.patch('/api/v1/timetable/attendance', markAttendance);
+
+router.patch('/api/v1/timetable/markTimetableAsDone', markTimetableAsDone);
 
 module.exports = router;

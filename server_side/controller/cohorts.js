@@ -228,6 +228,7 @@ const getCohortStudents = async (req, res) => {
         : 0; // Prevent division by zero
 
       return {
+        userId: student.userId,
         studentId: student.studentId,
         phoneNumber: student.phoneNumber,
         email: student.email,
