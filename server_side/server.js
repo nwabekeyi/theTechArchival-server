@@ -23,15 +23,9 @@ const instructorReviews = require("./Routes/insructorReviews");
 const payment = require("./Routes/paymentRoute");
 const enquiries = require("./Routes/enquiries");
 const announcementRoutes = require('./Routes/announcement');
-
-
-
 // Import rate limiting middleware
 const rateLimit = require('express-rate-limit');
 
-
-
-// Import the WebSocket logic
 
 // Database connection
 dbConnection();
@@ -48,29 +42,12 @@ const logFile = fs.createWriteStream(path.join(__dirname, "logFile.log"), {
 // Rate limiting setup (global for all routes)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   message: 'Too many requests from this IP, please try again after 15 minutes'
 });
 
-// Apply rate limiting middleware globally
-app.use(limiter);
 
 // Middleware functions
-// Set up CSP using Helmet
-app.use(helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.googleapis.com"],
-    connectSrc: ["'self'", "https://firestore.googleapis.com", "wss://babatech-e-learning.onrender.com", 'https://the-tech-archival-client-side-5wvq.vercel.app'], // Allow WSS connection
-    imgSrc: ["'self'", "data:", "https://*"],
-    mediaSrc: ["'self'", "https://*"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://*.googleapis.com"],
-  },
-}));
-
-
-app.use(morgan("dev", { stream: logFile }));
-
 /// List of allowed origins
 const allowedOrigins = [
   "https://the-tech-archival-client-side.vercel.app",
@@ -107,12 +84,27 @@ app.options('*', (req, res) => {
 });
 
 
+// Set up CSP using Helmet
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.googleapis.com"],
+    connectSrc: ["'self'", "https://firestore.googleapis.com", "wss://babatech-e-learning.onrender.com", 'https://the-tech-archival-client-side-5wvq.vercel.app'], // Allow WSS connection
+    imgSrc: ["'self'", "data:", "https://*"],
+    mediaSrc: ["'self'", "https://*"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://*.googleapis.com"],
+  },
+}));
+
 
 // Other middleware and routes follow
-
+// Apply rate limiting middleware globally
+app.use(limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(morgan("dev", { stream: logFile }));
+
 
 // Serve static files from the Vite `dist` folder
 const distPath = path.join(__dirname, '../client_side','dist');
