@@ -24,8 +24,8 @@ const messageSchema = new Schema({
 
   status: { 
     type: String, 
-    enum: ['sent', 'delivered', 'read'], 
-    default: 'sent' 
+    enum: ['sent', 'delivered', 'read', 'pending'], 
+    default: 'pending' 
   },
 
   // Array of recipients who have delivered the message
